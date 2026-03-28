@@ -1,8 +1,8 @@
 # Vaultopolis — Collectibles Market Analytics Extension
 
-Open-source Chrome extension that overlays real-time market analytics on NBA Top Shot, NFL All Day, and Disney Pinnacle marketplace pages.
+Open-source Chrome extension that gives you instant market intelligence on NBA Top Shot, NFL All Day, and Disney Pinnacle — right on the marketplace page.
 
-Hover over any listing card to see floor price, estimated value, trading volume, supply data, and more — without leaving the marketplace.
+Hover over any listing and instantly see what it's actually worth: floor price, estimated value, 7-day and 30-day averages, who's holding it, how liquid it is, and whether the market is active or dead. No more opening tabs, no more guessing, no more overpaying.
 
 <p align="center">
   <img src="assets/store/screenshot-topshot-price.png" width="240" alt="Price tab — Top Shot">
@@ -19,20 +19,40 @@ Hover over any listing card to see floor price, estimated value, trading volume,
 
 Browser extensions have access to the pages you visit. We believe you should be able to verify exactly what an extension does before installing it. This repository contains the complete, unobfuscated source code. There is no difference between what you see here and what runs in the extension.
 
-## What it does
+## Features
 
-- **Price tab** — Floor price, estimated value, 7d/30d averages, last sale, last activity
-- **Supply tab** — Total supply, listed count, unique holders, top holder concentration, floating supply
-- **Offers tab** — Top offer, offer count, 7d/30d sales volume
-- **Performance mode** — Block autoplay videos, reduce image quality, or hide all card media
+### Instant analytics on every card
 
-## What it does NOT do
+Hover over any listing and a clean overlay appears with three tabs of data:
 
-- Collect any personal data (no analytics, no tracking, no telemetry)
-- Access your wallet, account, credentials, or browsing history
-- Send data anywhere except `api.vaultopolis.com` (public read-only market data)
-- Load remote code (no CDNs, no eval, no dynamic imports)
-- Require any account or login
+- **Price** — Floor price, estimated value with confidence indicator, 7d/30d sale averages, last sale price, and when it last traded. See at a glance if something is priced above or below its recent market value.
+- **Supply** — Total supply, how many are listed, unique holder count, top wallet concentration, and floating supply percentage. Know immediately if a market is thin, concentrated, or healthy.
+- **Offers** — Highest active offer, total offer count, and 7d/30d sales volume. Understand demand before you buy.
+
+### Make the marketplace actually usable
+
+The official marketplace pages are heavy — autoplay videos, large images, and slow rendering. Vaultopolis includes built-in performance controls:
+
+- **Block moment videos** — Stop autoplay videos that lag your browser when scrolling through listings
+- **Reduce moment images** — Lower image quality so pages load faster, especially with hundreds of cards
+- **Hide all card media** — Strip videos and images entirely for the fastest possible browsing experience
+
+These aren't gimmicks. If you've ever had Top Shot freeze your browser while scrolling through 200+ listings, or waited 10+ seconds for All Day cards to render, these toggles make the marketplace usable again. Especially on older machines or slower connections.
+
+### Works across three marketplaces
+
+One extension, three platforms. The overlay adapts automatically — full-width on Top Shot and All Day, compact mode on Pinnacle's narrower cards.
+
+## Privacy and trust
+
+Browser extensions can be sketchy. This one is different:
+
+- **No data collection** — Zero analytics, zero tracking, zero telemetry. We don't know who you are and we don't want to.
+- **No wallet access** — Cannot see your account, credentials, NFTs, or purchase history.
+- **No browsing history** — Only runs on the three marketplace domains. Cannot see any other site you visit.
+- **No remote code** — Everything is bundled locally. No CDNs, no dynamic imports, no eval().
+- **No account required** — Install and go. No sign-up, no login, no email.
+- **Fully open source** — Every line of code is right here. Audit it yourself.
 
 See [PRIVACY.md](PRIVACY.md) for the full privacy policy and [SECURITY.md](SECURITY.md) for the security architecture.
 
