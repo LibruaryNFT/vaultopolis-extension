@@ -5,6 +5,7 @@
 
 import { TopShotDetector } from './detectors/topshot.js';
 import { Tooltip } from './tooltip.js';
+import { MediaControls } from './media-controls.js';
 
 class VaultopolisOverlay {
   constructor() {
@@ -26,12 +27,10 @@ class VaultopolisOverlay {
         this.enabled = changes.enabled.newValue;
         if (!this.enabled) this.tooltip.hide();
       }
-      if (changes.blockVideos || changes.reduceImages || changes.blockAllMedia) {
-        this.applyMediaSettings();
-      }
+      // Media settings handled by MediaControls
     });
 
-    this.applyMediaSettings();
+    new MediaControls('topshot').init();
     this.watchNavigation();
     this.watchDOM();
 
@@ -146,57 +145,6 @@ class VaultopolisOverlay {
     return best;
   }
 
-  /**
-   * Media settings — only targets moment card media, not site UI.
-   */
-  applyMediaSettings() {
-    chrome.storage.local.get(['blockVideos', 'reduceImages', 'blockAllMedia'], (result) => {
-      const blockVideos = result.blockVideos || result.blockAllMedia || false;
-      const reduceImages = result.reduceImages || result.blockAllMedia || false;
-      const blockAll = result.blockAllMedia || false;
-
-      this._setCSS('vp-block-videos', blockVideos,
-        `.card-content video, a[href*="/listings/"] video { display: none !important; }`);
-
-      this._setCSS('vp-reduce-images', reduceImages && !blockAll,
-        `img[src*="assets.nbatopshot.com/resize/editions/"] { image-rendering: pixelated; filter: contrast(1.05) brightness(0.98); }`);
-
-      this._setCSS('vp-block-all-media', blockAll,
-        `img[src*="assets.nbatopshot.com/resize/editions/"] { display: none !important; }
-         .card-content video { display: none !important; }`);
-
-      if (blockVideos) {
-        this._killCardVideos();
-        if (!this._mediaObs) {
-          this._mediaObs = new MutationObserver(() => this._killCardVideos());
-          this._mediaObs.observe(document.body, { childList: true, subtree: true });
-        }
-      } else if (this._mediaObs) {
-        this._mediaObs.disconnect();
-        this._mediaObs = null;
-      }
-    });
-  }
-
-  _setCSS(id, on, css) {
-    const el = document.getElementById(id);
-    if (on && !el) {
-      const s = document.createElement('style');
-      s.id = id;
-      s.textContent = css;
-      document.head.appendChild(s);
-    } else if (!on && el) {
-      el.remove();
-    }
-  }
-
-  _killCardVideos() {
-    document.querySelectorAll('.card-content video, a[href*="/listings/"] video').forEach(v => {
-      v.pause();
-      v.removeAttribute('autoplay');
-      v.preload = 'none';
-    });
-  }
 }
 
 const overlay = new VaultopolisOverlay();

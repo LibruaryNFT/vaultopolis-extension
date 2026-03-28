@@ -5,6 +5,7 @@
 
 import { PinnacleDetector } from './detectors/pinnacle.js';
 import { Tooltip } from './tooltip.js';
+import { MediaControls } from './media-controls.js';
 
 class VaultopolisOverlay {
   constructor() {
@@ -29,6 +30,7 @@ class VaultopolisOverlay {
       }
     });
 
+    new MediaControls('pinnacle').init();
     this.watchNavigation();
     this.watchDOM();
     window.addEventListener('scroll', () => this.tooltip.hideImmediate(), { passive: true });

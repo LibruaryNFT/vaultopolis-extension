@@ -298,7 +298,7 @@ export class Tooltip {
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(99, 102, 241, 0.3);
         border-radius: 10px;
-        padding: 12px 14px;
+        padding: 10px 12px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 13px;
         color: #e0e0e0;
@@ -335,11 +335,11 @@ export class Tooltip {
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
       }
 
       .vp-logo {
-        height: 18px;
+        height: 16px;
         width: auto;
       }
 
@@ -363,12 +363,12 @@ export class Tooltip {
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 6px;
+        margin-bottom: 2px;
       }
 
       .vp-player {
         font-weight: 700;
-        font-size: 16px;
+        font-size: 15px;
         color: #ffffff;
       }
 
@@ -421,7 +421,7 @@ export class Tooltip {
       .vp-tabs {
         display: flex;
         gap: 0;
-        margin: 8px 0 4px;
+        margin: 4px 0 2px;
         border-bottom: 1px solid rgba(45, 45, 74, 0.8);
       }
 
@@ -457,7 +457,7 @@ export class Tooltip {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 5px 0;
+        padding: 4px 0;
         border-bottom: 1px solid rgba(45, 45, 74, 0.4);
       }
 
@@ -480,7 +480,7 @@ export class Tooltip {
         display: flex;
         gap: 6px;
         margin-top: auto;
-        padding-top: 8px;
+        padding-top: 6px;
         border-top: 1px solid #2d2d4a;
       }
 
