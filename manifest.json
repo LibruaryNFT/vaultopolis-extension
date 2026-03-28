@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Vaultopolis — Collectibles Market Analytics",
+  "version": "1.0.0",
+  "description": "Floor prices, trends, and market analytics for NBA Top Shot, NFL All Day, and Disney Pinnacle",
+  "author": "Libruary (https://vaultopolis.com)",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://nbatopshot.com/*",
+    "https://nflallday.com/*",
+    "https://marketplace.nflallday.com/*",
+    "https://disneypinnacle.com/*",
+    "https://api.vaultopolis.com/*"
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/icons/icon-128.png", "assets/logo.svg"],
+      "matches": ["https://nbatopshot.com/*", "https://nflallday.com/*", "https://marketplace.nflallday.com/*", "https://disneypinnacle.com/*"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://nbatopshot.com/*"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://nflallday.com/*", "https://marketplace.nflallday.com/*"],
+      "js": ["dist/content-allday.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://disneypinnacle.com/*"],
+      "js": ["dist/content-pinnacle.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  }
+}

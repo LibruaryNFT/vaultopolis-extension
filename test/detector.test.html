@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vaultopolis Extension — Detector Tests</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+    .pass { color: #34d399; }
+    .fail { color: #ef4444; }
+    .section { margin: 16px 0; padding: 12px; background: #2d2d4a; border-radius: 6px; }
+    h2 { color: #8b5cf6; }
+    #results { white-space: pre-wrap; }
+
+    /* Simulated Top Shot card DOM */
+    .ts-card { border: 1px solid #444; padding: 10px; margin: 8px; display: inline-block; width: 200px; }
+    .card-content { padding: 8px; }
+    .card-rarity { font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Vaultopolis Extension — Detector Tests</h1>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- Simulated Top Shot DOM (matches real structure from JS bundle analysis) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+
+  <div class="section">
+    <h2>Simulated Top Shot Cards</h2>
+
+    <!-- Card 1: Link with setId+playId in URL (primary detection method) -->
+    <div id="card1" class="ts-card">
+      <a href="https://nbatopshot.com/listings/p2p/8+123">
+        <img src="placeholder.jpg" alt="LeBron James">
+        <div class="card-content">
+          <div class="card-rarity">
+            <span data-testid="Tile">LEGENDARY</span>
+          </div>
+          <span>LeBron James</span>
+          <span class="Price">$450.00</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Card 2: Link with parallel edition -->
+    <div id="card2" class="ts-card">
+      <a href="https://nbatopshot.com/listings/p2p/12+456?parallelID=3">
+        <img src="placeholder.jpg" alt="Stephen Curry">
+        <div class="card-content">
+          <div class="card-rarity">
+            <span data-testid="Tile">RARE</span>
+          </div>
+          <span>Stephen Curry</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Card 3: No href IDs, only player name (fallback detection) -->
+    <div id="card3" class="ts-card">
+      <a href="https://nbatopshot.com/search">
+        <img src="placeholder.jpg" alt="Ja Morant">
+        <div class="card-content">
+          <span>Ja Morant</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Card 4: Edition URL format -->
+    <div id="card4" class="ts-card">
+      <a href="https://nbatopshot.com/edition/5+789">
+        <div class="card-content">
+          <span>Kevin Durant</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Card 5: Query param format (older) -->
+    <div id="card5" class="ts-card">
+      <a href="https://nbatopshot.com/listing?setID=3&playID=99">
+        <div class="card-content">
+          <span>Giannis Antetokounmpo</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Card 6: No useful identifiers (should be detected by name only) -->
+    <div id="card6" class="ts-card">
+      <div class="card-content">
+        <span>Anthony Edwards</span>
+      </div>
+    </div>
+
+    <!-- Not a card: random div (should NOT be detected) -->
+    <div id="not-a-card">
+      <p>This is not a moment card, just random text.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Test Results</h2>
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    // Import the detector (from source, not built)
+    // We inline it here since this is a standalone test page
+
+    const SELECTORS = {
+      cards: [
+        '.card-content',
+        '.card-rarity',
+        '[data-testid="Tile"]',
+        '[data-testid="page-search"]',
+      ],
+      listingLinks: [
+        'a[href*="/listings/p2p/"]',
+        'a[href*="/moment/"]',
+        'a[href*="/edition/"]',
+      ],
+      playerName: [
+        '[data-testid="player-name"]',
+        '[class*="PlayerName"]',
+        '[class*="playerName"]',
+        '[class*="player-name"]',
+      ],
+      price: [
+        '[data-testid="price"]',
+        '[class*="Price"]',
+        '[class*="price"]',
+      ],
+    };
+
+    class TopShotDetector {
+      findEditionElements() {
+        const results = [];
+        const seen = new WeakSet();
+
+        for (const sel of SELECTORS.cards) {
+          for (const el of document.querySelectorAll(sel)) {
+            if (seen.has(el)) continue;
+            seen.add(el);
+            const info = this.extractInfo(el);
+            if (info) results.push({ element: el, ...info });
+          }
+        }
+
+        for (const sel of SELECTORS.listingLinks) {
+          for (const link of document.querySelectorAll(sel)) {
+            const cardContent = link.querySelector('.card-content') ||
+                                link.closest('.card-content');
+            const card = cardContent?.parentElement ||
+                         link.closest('[class*="Card"]') ||
+                         link.closest('[class*="card"]') ||
+                         link.parentElement?.parentElement || link;
+            if (seen.has(card)) continue;
+            seen.add(card);
+            const info = this.extractInfo(card, link.href);
+            if (info) results.push({ element: card, ...info });
+          }
+        }
+
+        if (results.length === 0) {
+          this.findByHeuristic(results, seen);
+        }
+
+        return results;
+      }
+
+      extractInfo(element, href) {
+        const info = {};
+        info.setId = element.dataset?.setId || element.dataset?.setid ||
+                     element.getAttribute('data-set-id');
+        info.playId = element.dataset?.playId || element.dataset?.playid ||
+                      element.getAttribute('data-play-id');
+
+        if (href) {
+          const parsed = this.parseHref(href);
+          if (parsed) {
+            info.setId = info.setId || parsed.setId;
+            info.playId = info.playId || parsed.playId;
+          }
+        }
+
+        // Also check links inside the element
+        if (!info.setId || !info.playId) {
+          const link = element.tagName === 'A' ? element : element.querySelector('a');
+          if (link?.href) {
+            const parsed = this.parseHref(link.href);
+            if (parsed) {
+              info.setId = info.setId || parsed.setId;
+              info.playId = info.playId || parsed.playId;
+            }
+          }
+        }
+
+        info.playerName = this.findPlayerName(element);
+        info.listingPrice = this.findPrice(element);
+
+        if ((info.setId && info.playId) || info.playerName) return info;
+        return null;
+      }
+
+      findPlayerName(element) {
+        for (const sel of SELECTORS.playerName) {
+          const el = element.querySelector(sel);
+          if (el?.textContent?.trim()) return el.textContent.trim();
+        }
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const text = walker.currentNode.textContent.trim();
+          if (this.looksLikePlayerName(text)) return text;
+        }
+        return null;
+      }
+
+      looksLikePlayerName(text) {
+        if (!text || text.length < 4 || text.length > 40) return false;
+        return /^[A-Z][a-zA-Z'.]+(\s+(Jr\.|Sr\.|II|III|IV|[A-Z][a-zA-Z'.]+)){1,3}$/.test(text);
+      }
+
+      findPrice(element) {
+        for (const sel of SELECTORS.price) {
+          const el = element.querySelector(sel);
+          if (el?.textContent) {
+            const match = el.textContent.match(/\$?([\d,]+\.?\d*)/);
+            if (match) return parseFloat(match[1].replace(',', ''));
+          }
+        }
+        return null;
+      }
+
+      parseHref(href) {
+        try {
+          const url = new URL(href);
+          const qSetId = url.searchParams.get('setID') || url.searchParams.get('set_id');
+          const qPlayId = url.searchParams.get('playID') || url.searchParams.get('play_id');
+          if (qSetId && qPlayId) return { setId: qSetId, playId: qPlayId };
+
+          const pathMatch = url.pathname.match(/\/(?:listings\/p2p|edition)\/(\d+)\+(\d+)/);
+          if (pathMatch) return { setId: pathMatch[1], playId: pathMatch[2] };
+        } catch {}
+        return null;
+      }
+
+      findByHeuristic(results, seen) {
+        const containers = document.querySelectorAll(
+          '[class*="grid"], [class*="Grid"], [class*="list"], [class*="List"]'
+        );
+        for (const container of containers) {
+          if (container.children.length < 3) continue;
+          for (const child of container.children) {
+            if (seen.has(child)) continue;
+            const img = child.querySelector('img');
+            if (!img) continue;
+            const info = this.extractInfo(child);
+            if (info) { seen.add(child); results.push({ element: child, ...info }); }
+          }
+        }
+      }
+    }
+
+    // ═══════════════════ TEST RUNNER ═══════════════════
+    const results = document.getElementById('results');
+    let passed = 0, failed = 0;
+
+    function assert(name, condition, detail) {
+      if (condition) {
+        results.innerHTML += `<span class="pass">✓ ${name}</span>\n`;
+        passed++;
+      } else {
+        results.innerHTML += `<span class="fail">✗ ${name} — ${detail || 'failed'}</span>\n`;
+        failed++;
+      }
+    }
+
+    const detector = new TopShotDetector();
+    const elements = detector.findEditionElements();
+
+    results.innerHTML += `Found ${elements.length} edition elements\n\n`;
+
+    // Test 1: Card with /listings/p2p/{setId}+{playId} URL
+    const card1 = elements.find(e => e.setId === '8' && e.playId === '123');
+    assert('Card 1: setId+playId from /listings/p2p/ URL', !!card1,
+      `Expected setId=8, playId=123. Found: ${JSON.stringify(elements.map(e => ({s:e.setId,p:e.playId})))}`);
+    assert('Card 1: player name detected', card1?.playerName === 'LeBron James',
+      `Got: "${card1?.playerName}"`);
+    assert('Card 1: price detected', card1?.listingPrice === 450,
+      `Got: ${card1?.listingPrice}`);
+
+    // Test 2: Card with parallel edition
+    const card2 = elements.find(e => e.setId === '12' && e.playId === '456');
+    assert('Card 2: parallel edition IDs', !!card2,
+      `Expected setId=12, playId=456`);
+    assert('Card 2: player name', card2?.playerName === 'Stephen Curry',
+      `Got: "${card2?.playerName}"`);
+
+    // Test 3: Card with no IDs — should detect by player name
+    const card3 = elements.find(e => e.playerName === 'Ja Morant');
+    assert('Card 3: player name fallback (no IDs in URL)', !!card3);
+
+    // Test 4: Edition URL format
+    const card4 = elements.find(e => e.setId === '5' && e.playId === '789');
+    assert('Card 4: /edition/{setId}+{playId} format', !!card4,
+      `Expected setId=5, playId=789`);
+    assert('Card 4: player name', card4?.playerName === 'Kevin Durant',
+      `Got: "${card4?.playerName}"`);
+
+    // Test 5: Query param format
+    const card5 = elements.find(e => e.setId === '3' && e.playId === '99');
+    assert('Card 5: ?setID=X&playID=Y query params', !!card5,
+      `Expected setId=3, playId=99`);
+
+    // Test 6: Name-only detection
+    const card6 = elements.find(e => e.playerName === 'Anthony Edwards');
+    assert('Card 6: name-only detection (no link)', !!card6);
+
+    // Test 7: Non-card not detected
+    const notCard = elements.find(e => {
+      const el = e.element;
+      return el.id === 'not-a-card' || el === document.getElementById('not-a-card');
+    });
+    assert('Non-card element NOT detected', !notCard);
+
+    // Test 8: parseHref edge cases
+    const ph = detector.parseHref('https://nbatopshot.com/listings/p2p/42+999');
+    assert('parseHref: /listings/p2p/42+999', ph?.setId === '42' && ph?.playId === '999',
+      `Got: ${JSON.stringify(ph)}`);
+
+    const ph2 = detector.parseHref('https://nbatopshot.com/edition/1+2');
+    assert('parseHref: /edition/1+2', ph2?.setId === '1' && ph2?.playId === '2',
+      `Got: ${JSON.stringify(ph2)}`);
+
+    const ph3 = detector.parseHref('https://nbatopshot.com/search');
+    assert('parseHref: /search returns null', ph3 === null);
+
+    const ph4 = detector.parseHref('https://nbatopshot.com/listing?setID=7&playID=88');
+    assert('parseHref: query params', ph4?.setId === '7' && ph4?.playId === '88',
+      `Got: ${JSON.stringify(ph4)}`);
+
+    // Test 9: looksLikePlayerName
+    assert('Name: "LeBron James"', detector.looksLikePlayerName('LeBron James'));
+    assert('Name: "Ja Morant"', detector.looksLikePlayerName('Ja Morant'));
+    assert('Name: "Patrick Mahomes II"', detector.looksLikePlayerName('Patrick Mahomes II'));
+    assert('Name: "Tim Duncan Jr."', detector.looksLikePlayerName('Tim Duncan Jr.'));
+    assert('Not name: "LEGENDARY"', !detector.looksLikePlayerName('LEGENDARY'));
+    assert('Not name: "$450.00"', !detector.looksLikePlayerName('$450.00'));
+    assert('Not name: "View on marketplace"', !detector.looksLikePlayerName('View on marketplace'));
+    assert('Not name: empty', !detector.looksLikePlayerName(''));
+
+    // Summary
+    results.innerHTML += `\n════════════════════════════════\n`;
+    results.innerHTML += `<span class="${failed ? 'fail' : 'pass'}">${passed} passed, ${failed} failed</span>\n`;
+  </script>
+</body>
+</html>

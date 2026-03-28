@@ -1,0 +1,15 @@
+{
+  "name": "vaultopolis-ext",
+  "version": "1.0.0",
+  "description": "Market analytics overlay for NBA Top Shot",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright": "^1.58.2"
+  }
+}

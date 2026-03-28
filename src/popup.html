@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .logo-full { height: 24px; width: auto; }
+    .subtitle { color: #8b8bab; font-size: 11px; margin-bottom: 14px; }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-top: 1px solid #2d2d4a;
+    }
+
+    .toggle-label { font-size: 12px; }
+    .toggle-desc { font-size: 10px; color: #6b7280; margin-top: 1px; }
+
+    .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: #374151; border-radius: 20px; transition: 0.2s;
+    }
+    .slider::before {
+      content: ""; position: absolute;
+      height: 14px; width: 14px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: 0.2s;
+    }
+    input:checked + .slider { background: #6366f1; }
+    input:checked + .slider::before { transform: translateX(16px); }
+
+    .section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: #6b7280; margin-top: 10px; margin-bottom: 2px;
+    }
+
+    .link {
+      display: block; margin-top: 12px; text-align: center;
+      color: #6366f1; text-decoration: none; font-size: 12px;
+    }
+    .link:hover { color: #8b5cf6; }
+
+    .social-row {
+      display: flex; justify-content: center; gap: 16px;
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid #2d2d4a;
+    }
+    .social-link {
+      color: #8b8bab; text-decoration: none; font-size: 11px; transition: color 0.15s;
+    }
+    .social-link:hover { color: #6366f1; }
+
+    .oss-badge {
+      margin-top: 10px; padding: 6px 8px;
+      background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 6px; font-size: 10px; color: #8b8bab; text-align: center;
+    }
+    .oss-icon { font-size: 11px; }
+    .oss-link { color: #6366f1; text-decoration: none; }
+    .oss-link:hover { color: #8b5cf6; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img class="logo-full" src="/assets/logo.svg" alt="Vaultopolis" id="logo">
+  </div>
+  <div class="subtitle">Market analytics for Top Shot, All Day, and Pinnacle</div>
+
+  <div class="toggle-row">
+    <div><div class="toggle-label">Analytics overlay</div></div>
+    <label class="toggle"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="section-label">Performance</div>
+
+  <div class="toggle-row">
+    <div><div class="toggle-label">Block moment videos</div><div class="toggle-desc">Stop autoplay on card hover</div></div>
+    <label class="toggle"><input type="checkbox" id="blockVideos"><span class="slider"></span></label>
+  </div>
+  <div class="toggle-row">
+    <div><div class="toggle-label">Reduce moment images</div><div class="toggle-desc">Lower quality card images</div></div>
+    <label class="toggle"><input type="checkbox" id="reduceImages"><span class="slider"></span></label>
+  </div>
+  <div class="toggle-row">
+    <div><div class="toggle-label">Hide all card media</div><div class="toggle-desc">Hide moment videos and images</div></div>
+    <label class="toggle"><input type="checkbox" id="blockAllMedia"><span class="slider"></span></label>
+  </div>
+
+  <a class="link" href="https://vaultopolis.com" target="_blank" rel="noopener">
+    Open Vaultopolis Dashboard
+  </a>
+
+  <div class="oss-badge">
+    <span class="oss-icon">&#128275;</span> Open source — <a class="oss-link" href="https://github.com/LibruaryNFT/vaultopolis-extension" target="_blank" rel="noopener">view source code</a>
+  </div>
+
+  <div class="social-row">
+    <a class="social-link" href="https://x.com/vaultopolis" target="_blank" rel="noopener">Twitter/X</a>
+    <a class="social-link" href="https://discord.gg/nJdwqYfenh" target="_blank" rel="noopener">Discord</a>
+    <a class="social-link" href="https://github.com/LibruaryNFT/vaultopolis-extension" target="_blank" rel="noopener">GitHub</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
