@@ -4,6 +4,17 @@ Open-source Chrome extension that overlays real-time market analytics on NBA Top
 
 Hover over any listing card to see floor price, estimated value, trading volume, supply data, and more — without leaving the marketplace.
 
+<p align="center">
+  <img src="assets/store/screenshot-topshot-price.png" width="240" alt="Price tab — Top Shot">
+  <img src="assets/store/screenshot-topshot-supply.png" width="240" alt="Supply tab — Top Shot">
+  <img src="assets/store/screenshot-offers-tab.png" width="240" alt="Offers tab">
+</p>
+<p align="center">
+  <img src="assets/store/screenshot-allday-price.png" width="240" alt="NFL All Day">
+  <img src="assets/store/screenshot-pinnacle-compact.png" width="160" alt="Disney Pinnacle (compact)">
+  <img src="assets/store/screenshot-popup.png" width="220" alt="Settings popup">
+</p>
+
 ## Why open source?
 
 Browser extensions have access to the pages you visit. We believe you should be able to verify exactly what an extension does before installing it. This repository contains the complete, unobfuscated source code. There is no difference between what you see here and what runs in the extension.
@@ -122,6 +133,14 @@ node test/detector-validation.js
 - Minimal Chrome permissions (storage only)
 
 Report vulnerabilities privately via [Twitter DM](https://x.com/vaultopolis) or [Discord](https://discord.gg/nJdwqYfenh). Do not open public issues for security reports.
+
+## Feedback and suggestions
+
+Have ideas, found a bug, or want to request a feature? Join the conversation:
+
+- **Discord** — [discord.gg/nJdwqYfenh](https://discord.gg/nJdwqYfenh)
+- **Twitter/X** — [@vaultopolis](https://x.com/vaultopolis)
+- **GitHub Issues** — [open an issue](https://github.com/LibruaryNFT/vaultopolis-extension/issues)
 
 ## Contributing
 
