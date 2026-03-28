@@ -7,15 +7,15 @@
 const SITE_SELECTORS = {
   topshot: {
     videos: '.card-content video, a[href*="/listings/"] video',
-    images: 'img[src*="assets.nbatopshot.com"]',
+    images: 'a[href*="/listings/"] img, .card-content img',
   },
   allday: {
-    videos: 'video, a[href*="/listing/"] video',
-    images: 'img[src*="assets.nflallday.com"], img[src*="assets.allday"], img[src*="media.nflallday"]',
+    videos: 'a[href*="/listing/moment/"] video, a[href*="/listing/moment/"] ~ video',
+    images: 'a[href*="/listing/moment/"] img, a[href*="/listing/moment/"] picture img',
   },
   pinnacle: {
-    videos: 'video',
-    images: 'img[src*="disneypinnacle"], img[src*="pinnacle"]',
+    videos: 'a[href*="/pin/"] video, a[href*="/collectible/"] video',
+    images: 'a[href*="/pin/"] img, a[href*="/collectible/"] img',
   },
 };
 

@@ -13,6 +13,8 @@ const storeDir = path.resolve(__dirname, '..', 'assets', 'store');
 const tooltipSrc = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'tooltip.js'), 'utf-8');
 const popupHtml = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'popup.html'), 'utf-8');
 const popupJs = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'popup.js'), 'utf-8');
+const logoSvg = fs.readFileSync(path.resolve(__dirname, '..', 'assets', 'logo.svg'), 'utf-8');
+const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString('base64')}`;
 
 if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
 
@@ -121,11 +123,11 @@ async function createTooltipPage(browser, width, height, ed, listingPrice, listi
     </html>
   `);
 
-  await page.evaluate((src) => {
-    window.chrome = { runtime: { getURL: (p) => `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>` } };
+  await page.evaluate(({ src, logo }) => {
+    window.chrome = { runtime: { getURL: (p) => p.includes('logo') ? logo : '' } };
     const code = src.replace(/^export\s+/gm, '');
     new Function(code + '\nwindow.Tooltip = Tooltip;')();
-  }, tooltipSrc);
+  }, { src: tooltipSrc, logo: logoDataUri });
 
   await page.evaluate(({ ed, price, url, tab }) => {
     const card = document.getElementById('card');
@@ -183,22 +185,25 @@ async function run() {
   console.log('  6/6 Popup settings');
   page = await browser.newPage({ viewport: { width: 320, height: 500 } });
   // Render the popup HTML with mocked chrome.storage
-  const modifiedPopupHtml = popupHtml.replace(
-    '<script src="popup.js"></script>',
-    `<script>
-      window.chrome = {
-        storage: {
-          local: {
-            get: function(keys, cb) {
-              cb({ enabled: true, blockVideos: true, reduceImages: false, blockAllMedia: false });
-            },
-            set: function() {}
+  const modifiedPopupHtml = popupHtml
+    .replace('/assets/logo.svg', logoDataUri)
+    .replace(
+      '<script src="popup.js"></script>',
+      `<script>
+        window.chrome = {
+          runtime: { getURL: function(p) { return p; } },
+          storage: {
+            local: {
+              get: function(keys, cb) {
+                cb({ enabled: true, blockVideos: true, reduceImages: false, blockAllMedia: false });
+              },
+              set: function() {}
+            }
           }
-        }
-      };
-    </script>
-    <script>${popupJs}</script>`
-  );
+        };
+      </script>
+      <script>${popupJs}</script>`
+    );
   await page.setContent(modifiedPopupHtml);
   await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(storeDir, 'screenshot-popup.png') });
