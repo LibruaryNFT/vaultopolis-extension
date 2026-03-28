@@ -33,28 +33,29 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy policy and [SECURITY.md](SECUR
 | NFL All Day | nflallday.com |
 | Disney Pinnacle | disneypinnacle.com |
 
-## Install from source
+## Install
+
+1. Download the latest zip from the [Releases page](https://github.com/LibruaryNFT/vaultopolis-extension/releases)
+2. Unzip to any folder
+3. Open Chrome and go to `chrome://extensions`
+4. Turn on **Developer mode** (toggle in the top right)
+5. Click **Load unpacked** and select the unzipped folder
+6. Visit any supported marketplace and hover over a listing card
+
+That's it — no accounts, no build tools, no sign-up.
+
+## Build from source (for developers)
+
+If you want to verify or modify the code yourself:
 
 ```bash
-# Clone the repo
 git clone https://github.com/LibruaryNFT/vaultopolis-extension.git
 cd vaultopolis-extension
-
-# Install dev dependencies (esbuild only — zero runtime deps)
-npm install
-
-# Build
-npm run build
+npm install    # dev dependencies only (esbuild)
+npm run build  # bundles src/ → dist/
 ```
 
-Then load in Chrome:
-
-1. Go to `chrome://extensions`
-2. Enable "Developer mode" (top right)
-3. Click "Load unpacked"
-4. Select the `vaultopolis-extension` root folder (not `dist/`)
-
-The extension activates automatically on supported marketplace pages.
+Then load in Chrome using the same steps above (Load unpacked → select the repo folder).
 
 ## Project structure
 
