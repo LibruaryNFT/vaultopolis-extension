@@ -1,5 +1,7 @@
 # Vaultopolis — Collectibles Market Analytics Extension
 
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Chrome MV3](https://img.shields.io/badge/Chrome-Manifest%20V3-green) ![Dependencies: 0](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
+
 Open-source Chrome extension that gives you instant market intelligence on NBA Top Shot, NFL All Day, and Disney Pinnacle — right on the marketplace page.
 
 Hover over any listing and instantly see what it's actually worth: floor price, estimated value, 7-day and 30-day averages, who's holding it, how liquid it is, and whether the market is active or dead. No more opening tabs, no more guessing, no more overpaying.
