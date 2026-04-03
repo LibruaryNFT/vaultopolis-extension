@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "osvVulnerabilityAlerts": true,
+  "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Security vulnerabilities: fast-track with 1-day supply chain window",
+      "isVulnerabilityAlert": true,
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "1 day",
+      "labels": ["dependencies", "security"]
+    },
+    {
+      "description": "Dev dependencies patch+minor: auto-merge after 1-day window",
+      "matchDepTypes": ["devDependencies", "dev"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "1 day"
+    },
+    {
+      "description": "Prod dependencies patch: auto-merge after 3-day supply chain window",
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Minor updates: raise PR, hold for manual review",
+      "matchUpdateTypes": ["minor"],
+      "automerge": false
+    },
+    {
+      "description": "Major updates: hold, never auto-merge",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"]
+    },
+    {
+      "description": "GitHub Actions: auto-merge patch/minor after 3-day window",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    }
+  ]
+}
