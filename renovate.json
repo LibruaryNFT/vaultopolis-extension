@@ -24,23 +24,12 @@
       "minimumReleaseAge": "1 day"
     },
     {
-      "description": "Prod dependencies patch: auto-merge after 3-day supply chain window",
+      "description": "Prod dependencies patch+minor: auto-merge after 3-day supply chain window (CI is the safety net)",
       "matchDepTypes": ["dependencies"],
-      "matchUpdateTypes": ["patch"],
+      "matchUpdateTypes": ["patch", "minor"],
       "automerge": true,
       "automergeType": "pr",
       "minimumReleaseAge": "3 days"
-    },
-    {
-      "description": "Minor updates: raise PR, hold for manual review",
-      "matchUpdateTypes": ["minor"],
-      "automerge": false
-    },
-    {
-      "description": "Major updates: hold, never auto-merge",
-      "matchUpdateTypes": ["major"],
-      "automerge": false,
-      "labels": ["dependencies", "major-update"]
     },
     {
       "description": "GitHub Actions: auto-merge patch/minor after 3-day window",
@@ -49,6 +38,12 @@
       "automerge": true,
       "automergeType": "pr",
       "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Major updates: hold, never auto-merge",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"]
     }
   ]
 }
