@@ -6,36 +6,85 @@
 import { AllDayDetector } from './detectors/allday.js';
 import { Tooltip } from './tooltip.js';
 import { MediaControls } from './media-controls.js';
+import { CardBadge } from './card-badge.js';
 
 class VaultopolisOverlay {
   constructor() {
     this.detector = new AllDayDetector();
     this.tooltip = new Tooltip();
+    this.badge = new CardBadge('allday');
     this.currentUrl = window.location.href;
     this.processedElements = new WeakSet();
+    this._processedArray = [];
     this.debounceTimer = null;
     this.enabled = true;
     this.product = 'allday';
+    this.currentTooltipEl = null;
+    this._pausedVideo = null;
+    this._lastCheck = 0;
   }
 
   init() {
-    chrome.storage.local.get('enabled', (result) => {
+    chrome.storage.local.get(['enabled', 'alwaysOn'], (result) => {
       this.enabled = result.enabled !== false;
+      this.badge.setEnabled(!!result.alwaysOn);
     });
 
     chrome.storage.onChanged.addListener((changes) => {
       if (changes.enabled) {
         this.enabled = changes.enabled.newValue;
-        if (!this.enabled) this.tooltip.hide();
+        if (!this.enabled) this._hide();
+      }
+      if (changes.alwaysOn) {
+        this.badge.setEnabled(changes.alwaysOn.newValue);
+        if (changes.alwaysOn.newValue) {
+          this.badge.observeAll(this.processedElements, this._processedArray);
+        }
       }
     });
 
     new MediaControls('allday').init();
     this.watchNavigation();
     this.watchDOM();
-    window.addEventListener('scroll', () => this.tooltip.hideImmediate(), { passive: true });
+
+    // Single global handler — covers hover and scroll-under-cursor in one place.
+    // Throttled to 16ms (~60fps); elementsFromPoint is cheap at this rate.
+    window.addEventListener('mousemove', (e) => {
+      const now = performance.now();
+      if (now - this._lastCheck < 16) return;
+      this._lastCheck = now;
+      this._checkPoint(e.clientX, e.clientY);
+    }, { passive: true });
+
+    // Scroll just hides — mousemove will re-trigger if cursor is over a card when scroll stops.
+    window.addEventListener('scroll', () => this._hide(), { passive: true });
+
     setTimeout(() => this.scanPage(), 3000);
     setTimeout(() => this.scanPage(), 6000);
+  }
+
+  _checkPoint(x, y) {
+    if (!this.enabled) return;
+    if (this.badge.enabled) return;
+    let found = null;
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (this.processedElements.has(el)) { found = el; break; }
+    }
+    if (found && found !== this.currentTooltipEl) {
+      this.currentTooltipEl = found;
+      this.showTooltip({ currentTarget: found });
+    } else if (!found && this.currentTooltipEl) {
+      this._hide();
+    }
+  }
+
+  _hide() {
+    this.currentTooltipEl = null;
+    if (this._pausedVideo) {
+      this._pausedVideo.play().catch(() => {});
+      this._pausedVideo = null;
+    }
+    this.tooltip.hideImmediate();
   }
 
   watchNavigation() {
@@ -68,15 +117,24 @@ class VaultopolisOverlay {
     for (const { element, editionId, playerName, listingPrice } of this.detector.findEditionElements()) {
       if (this.processedElements.has(element)) continue;
       this.processedElements.add(element);
+      this._processedArray.push(element);
       element._vpData = { editionId, playerName, listingPrice, listingUrl: element.href };
-      element.addEventListener('mouseenter', (e) => this.showTooltip(e));
-      element.addEventListener('mouseleave', () => this.tooltip.hide());
+      this.badge.observe(element);
     }
   }
 
   async showTooltip(event) {
     if (!this.enabled) return;
     const el = event.currentTarget;
+    if (!el._vpData) return;
+
+    // Pause any video playing under the overlay — can't see it anyway
+    const vid = el.querySelector('video') || el.parentElement?.querySelector('video');
+    if (vid && !vid.paused) {
+      vid.pause();
+      this._pausedVideo = vid;
+    }
+
     const { editionId, playerName, listingPrice, listingUrl } = el._vpData;
 
     let rect = el.getBoundingClientRect();
@@ -104,7 +162,7 @@ class VaultopolisOverlay {
       }
 
       if (edition) {
-        this.tooltip.showData(rect, edition, listingPrice, listingUrl);
+        this.tooltip.showData(rect, edition, listingPrice, listingUrl, this.product);
       } else {
         this.tooltip.showError(rect, 'Data not available');
       }

@@ -7,15 +7,17 @@
 const SITE_SELECTORS = {
   topshot: {
     videos: '.card-content video, a[href*="/listings/"] video',
-    images: 'a[href*="/listings/"] img, .card-content img',
+    // Exclude badge/icon images (small avatars, SVG icons, tier badges)
+    images: 'a[href*="/listings/"] img:not([src*="badge"]):not([src*="icon"]):not([src*="tier"]):not([src*="avatar"]), .card-content img:not([src*="badge"]):not([src*="icon"])',
   },
   allday: {
     videos: 'a[href*="/listing/moment/"] video, a[href*="/listing/moment/"] ~ video',
-    images: 'a[href*="/listing/moment/"] img, a[href*="/listing/moment/"] picture img',
+    // Exclude .chakra-avatar__img (Hall of Fame, badges etc) and SVG badge icons
+    images: 'a[href*="/listing/moment/"] img:not(.chakra-avatar__img):not([src*="badge"]):not([src*="icon"]), a[href*="/listing/moment/"] picture img:not(.chakra-avatar__img)',
   },
   pinnacle: {
     videos: 'a[href*="/pin/"] video, a[href*="/collectible/"] video',
-    images: 'a[href*="/pin/"] img, a[href*="/collectible/"] img',
+    images: 'a[href*="/pin/"] img:not([src*="badge"]):not([src*="icon"]):not([src*="avatar"]), a[href*="/collectible/"] img:not([src*="badge"]):not([src*="icon"]):not([src*="avatar"])',
   },
 };
 
@@ -43,14 +45,19 @@ export class MediaControls {
       const blockAll = result.blockAllMedia || false;
 
       this._setCSS('vp-block-videos', blockVideos,
-        `${this.sel.videos} { display: none !important; }`);
+        `${this.sel.videos} { visibility: hidden !important; opacity: 0 !important; }`);
 
       this._setCSS('vp-reduce-images', reduceImages && !blockAll,
         `${this.sel.images} { image-rendering: pixelated; filter: contrast(1.05) brightness(0.98); }`);
 
       this._setCSS('vp-block-all-media', blockAll,
-        `${this.sel.images} { display: none !important; }
-         ${this.sel.videos} { display: none !important; }`);
+        `${this.sel.images} { visibility: hidden !important; opacity: 0 !important; }
+         ${this.sel.videos} { visibility: hidden !important; opacity: 0 !important; }`);
+
+      // Always restore visibility for our overlay content — media rules must never bleed in.
+      this._setCSS('vp-overlay-restore', blockVideos || reduceImages || blockAll,
+        `.vp-always-overlay * { visibility: visible !important; }
+         .vp-restore-btn { visibility: visible !important; }`);
 
       if (blockVideos) {
         this._killVideos();

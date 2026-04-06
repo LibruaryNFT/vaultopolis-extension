@@ -74,7 +74,7 @@ export class Tooltip {
     this.visible = true;
   }
 
-  showData(rect, ed, listingPrice, listingUrl) {
+  showData(rect, ed, listingPrice, listingUrl, product = 'topshot') {
     if (!this.visible) return;
 
     const playerName = ed.player_name || ed.character_name || ed.FullName || ed.shape_name || ed.team || ed.set_name || 'Unknown';
@@ -93,24 +93,6 @@ export class Tooltip {
     const daysSince = this.num(ed.days_since_last_sale);
     const conc = this.num(ed.concentration_pct);
 
-    // Derived: valuation gap
-    let valueLine = '';
-    if (floor && estValue && estValue > 0 && confidence !== 'none') {
-      const gapPct = ((floor - estValue) / estValue * 100);
-      const gapColor = gapPct < -5 ? '#34d399' : gapPct > 10 ? '#ef4444' : '#8b8bab';
-      const gapLabel = gapPct < -5 ? `${gapPct.toFixed(0)}% underpriced` :
-                        gapPct > 10 ? `+${gapPct.toFixed(0)}% premium` : 'Fair value';
-      valueLine = `<div class="vp-derived" style="color:${gapColor}">${gapLabel}</div>`;
-    }
-
-    // Derived: market health
-    let marketBadge = '';
-    if (sales7d >= 5) marketBadge = '<span class="vp-badge" style="background:#34d39922;color:#34d399">Active</span>';
-    else if (sales7d >= 1) marketBadge = '<span class="vp-badge" style="background:#fbbf2422;color:#fbbf24">Moderate</span>';
-    else if (sales30d >= 3) marketBadge = '<span class="vp-badge" style="background:#fb923c22;color:#fb923c">Slow</span>';
-    else if (sales180d >= 1) marketBadge = '<span class="vp-badge" style="background:#ef444422;color:#ef4444">Dormant</span>';
-    else marketBadge = '<span class="vp-badge" style="background:#6b728022;color:#6b7280">No Sales</span>';
-
     // Derived: last activity
     let lastActivity = '';
     if (daysSince == null || sales180d === 0) lastActivity = 'Never sold';
@@ -118,67 +100,53 @@ export class Tooltip {
     else if (daysSince < 180) lastActivity = `${daysSince}d ago`;
     else lastActivity = '6+ months ago';
 
-    // Deal badge
-    let dealBadge = '';
-    if (listingPrice && floor && floor > 0) {
-      const ratio = listingPrice / floor;
-      if (ratio <= 0.95) dealBadge = '<span class="vp-badge vp-badge-good">Below Floor</span>';
-      else if (ratio >= 1.5) dealBadge = '<span class="vp-badge vp-badge-high">Above Avg</span>';
-    }
-
-    // Concentration warning
-    let concWarn = '';
-    if (conc && conc > 5 && supply > 10) {
-      const c = conc > 15 ? '#ef4444' : '#fbbf24';
-      concWarn = `<div class="vp-warning" style="color:${c}">&#9888; ${conc.toFixed(1)}% held by top wallet</div>`;
-    }
 
     // Fair value
-    const confIcon = confidence === 'high' ? '&#10003;' : confidence === 'medium' ? '~' : '?';
     const fairRow = estValue && confidence !== 'none'
-      ? this.statRow('Est. Value', `${this.dollar(estValue)} <span style="color:#6b7280;font-size:11px">(${confIcon})</span>`)
+      ? this.statRow('Est. Value', this.dollar(estValue))
       : '';
 
     // Build tab content
     const asp7d = this.num(ed.asp_7d);
     const asp30d = this.num(ed.asp_30d);
+    const asp180d = this.num(ed.asp_180d);
     const lastSale = this.num(ed.last_sale_price);
-    const highOffer = this.num(ed.highest_edition_offer);
+    const highOffer = this.num(ed.highest_edition_offer || ed.highest_offer);
     const offerCount = this.num(ed.edition_offer_count);
     const floating = this.num(ed.floating_supply_pct);
+    const burnCount = this.num(ed.burn_count);
+    const liquidityScore = this.num(ed.liquidity_score);
 
     const tabs = {
       price: `
         ${floor ? this.statRow('Floor', this.dollar(floor)) : ''}
         ${fairRow}
-        ${this.statRow('7d Avg', this.dollar(asp7d))}
-        ${this.statRow('30d Avg', this.dollar(asp30d))}
+        ${this.statRow('7d Avg', asp7d ? this.dollar(asp7d) : 'N/A')}
+        ${this.statRow('30d Avg', asp30d ? this.dollar(asp30d) : 'N/A')}
+        ${asp180d ? this.statRow('180d Avg', this.dollar(asp180d)) : ''}
         ${lastSale ? this.statRow('Last Sale', this.dollar(lastSale)) : ''}
         ${this.statRow('Last Activity', lastActivity || null)}
       `,
       supply: `
         ${this.statRow('Supply', supply ? Number(supply).toLocaleString() : null)}
+        ${burnCount ? this.statRow('Burned', burnCount.toLocaleString()) : ''}
         ${listed != null ? this.statRow('Listed', Number(listed).toLocaleString()) : ''}
         ${holders != null ? this.statRow('Holders', Number(holders).toLocaleString()) : ''}
         ${conc != null ? this.statRow('Top Holder', `${conc.toFixed(1)}%`) : ''}
         ${floating != null ? this.statRow('Floating', `${floating.toFixed(1)}%`) : ''}
-        ${concWarn}
       `,
       offers: `
-        ${this.statRow('Top Offer', this.dollar(highOffer))}
+        ${this.statRow('Top Offer', highOffer ? this.dollar(highOffer) : 'N/A')}
         ${offerCount ? this.statRow('Offers', String(offerCount)) : ''}
         ${sales7d != null ? this.statRow('Sales (7d)', String(sales7d)) : ''}
         ${sales30d != null ? this.statRow('Sales (30d)', String(sales30d)) : ''}
+        ${liquidityScore != null ? this.statRow('Liquidity', `${Math.round(liquidityScore)}/100`) : ''}
       `,
     };
 
     this.container.innerHTML = `
       <div class="vp-header">
         <img class="vp-logo" src="${this.logoUrl}" alt="Vaultopolis">
-        <span class="vp-tier ${tierClass}">${tier}</span>
-      </div>
-      <div class="vp-player-row">
-        <span class="vp-player">${this.esc(playerName)}</span>
       </div>
       <div class="vp-tabs">
         <button class="vp-tab vp-tab-active" data-tab="price">Price</button>
@@ -190,7 +158,7 @@ export class Tooltip {
       <div class="vp-tab-content" data-tab="offers" style="display:none">${tabs.offers}</div>
       <div class="vp-actions">
         ${listingUrl ? `<a class="vp-btn vp-btn-listing" href="${this.esc(listingUrl)}">View Listing</a>` : ''}
-        <a class="vp-btn vp-btn-analytics" href="${this.buildEditionUrl(ed)}" target="_blank" rel="noopener">Full Analytics</a>
+        <a class="vp-btn vp-btn-analytics" href="${this.buildEditionUrl(ed, product)}" target="_blank" rel="noopener">Full Analytics</a>
       </div>
     `;
 
@@ -246,7 +214,13 @@ export class Tooltip {
     this.hoveredOnTooltip = false;
   }
 
-  buildEditionUrl(ed) {
+  buildEditionUrl(ed, product = 'topshot') {
+    if (product === 'allday' || product === 'pinnacle') {
+      const edId = ed.edition_id;
+      if (!edId) return 'https://vaultopolis.com';
+      return `https://vaultopolis.com/analytics/${product}/edition/${edId}`;
+    }
+    // Top Shot
     const setId = ed.setID || ed.set_id;
     const playId = ed.playID || ed.play_id;
     if (!setId || !playId) return 'https://vaultopolis.com';
@@ -297,17 +271,20 @@ export class Tooltip {
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(99, 102, 241, 0.3);
-        border-radius: 10px;
+        border-radius: 12px;
         padding: 10px 12px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 13px;
         color: #e0e0e0;
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
         pointer-events: auto;
-        overflow-y: auto;
+        overflow: hidden;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
+        max-height: calc(100vh - 16px);
+        animation: vpFadeIn 0.12s ease-out;
+        padding-bottom: 52px;
       }
 
       /* Compact mode for narrow cards (Pinnacle ~183px) */
@@ -324,7 +301,8 @@ export class Tooltip {
       .vp-compact .vp-value { font-size: 12px; }
       .vp-compact .vp-stat { padding: 3px 0; }
       .vp-compact .vp-btn { font-size: 10px; padding: 5px 0; }
-      .vp-compact .vp-actions { gap: 4px; }
+      .vp-compact .vp-actions { gap: 4px; padding: 6px 10px; }
+      .vp-compact { padding-bottom: 46px; }
 
       @keyframes vpFadeIn {
         from { opacity: 0; transform: scale(0.97); }
@@ -346,7 +324,7 @@ export class Tooltip {
       .vp-tier {
         margin-left: auto;
         padding: 2px 8px;
-        border-radius: 4px;
+        border-radius: 6px;
         font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
@@ -374,7 +352,7 @@ export class Tooltip {
 
       .vp-badge {
         padding: 1px 6px;
-        border-radius: 3px;
+        border-radius: 4px;
         font-size: 9px;
         font-weight: 700;
         text-transform: uppercase;
@@ -435,6 +413,7 @@ export class Tooltip {
         font-weight: 600;
         cursor: pointer;
         border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
         transition: 0.15s;
         font-family: inherit;
       }
@@ -448,8 +427,8 @@ export class Tooltip {
 
       .vp-tab-content {
         padding: 6px 0;
-        flex: 1;
         overflow-y: auto;
+        flex: 1 1 0;
         min-height: 0;
       }
 
@@ -458,7 +437,7 @@ export class Tooltip {
         justify-content: space-between;
         align-items: center;
         padding: 4px 0;
-        border-bottom: 1px solid rgba(45, 45, 74, 0.4);
+        border-bottom: 1px solid rgba(45, 45, 74, 0.6);
       }
 
       .vp-stat:last-child {
@@ -477,18 +456,23 @@ export class Tooltip {
       }
 
       .vp-actions {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
         display: flex;
         gap: 6px;
-        margin-top: auto;
-        padding-top: 6px;
-        border-top: 1px solid #2d2d4a;
+        padding: 8px 12px;
+        border-top: 1px solid rgba(45, 45, 74, 0.8);
+        background: rgba(10, 10, 24, 0.98);
+        border-radius: 0 0 12px 12px;
       }
 
       .vp-btn {
         flex: 1;
         display: block;
         padding: 7px 0;
-        border-radius: 6px;
+        border-radius: 8px;
         text-decoration: none;
         font-size: 11px;
         font-weight: 600;

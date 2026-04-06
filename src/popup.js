@@ -1,10 +1,15 @@
 // Fix logo path for Chrome extension context
 document.getElementById('logo').src = chrome.runtime.getURL('assets/logo.svg');
 
-const ALL_KEYS = ['enabled', 'blockVideos', 'reduceImages', 'blockAllMedia'];
+// Show version from manifest
+const { version } = chrome.runtime.getManifest();
+document.getElementById('version').textContent = `v${version}`;
+
+const ALL_KEYS = ['enabled', 'alwaysOn', 'blockVideos', 'reduceImages', 'blockAllMedia'];
 
 const DEFAULTS = {
   enabled: true,
+  alwaysOn: false,
   blockVideos: false,
   reduceImages: false,
   blockAllMedia: false,
@@ -25,11 +30,18 @@ for (const key of ALL_KEYS) {
   el.addEventListener('change', () => {
     const update = { [key]: el.checked };
 
-    if (key === 'blockAllMedia' && el.checked) {
-      document.getElementById('blockVideos').checked = true;
-      document.getElementById('reduceImages').checked = true;
-      update.blockVideos = true;
-      update.reduceImages = true;
+    if (key === 'blockAllMedia') {
+      // Toggling the master also toggles sub-options
+      document.getElementById('blockVideos').checked = el.checked;
+      document.getElementById('reduceImages').checked = el.checked;
+      update.blockVideos = el.checked;
+      update.reduceImages = el.checked;
+    }
+
+    if ((key === 'blockVideos' || key === 'reduceImages') && !el.checked) {
+      // If a sub-option is manually unchecked, the master can't be fully "on"
+      document.getElementById('blockAllMedia').checked = false;
+      update.blockAllMedia = false;
     }
 
     chrome.storage.local.set(update);

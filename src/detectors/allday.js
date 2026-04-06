@@ -22,24 +22,45 @@ export class AllDayDetector {
 
     const links = document.querySelectorAll('a[href*="/listing/moment/"]');
 
+    // Group links by momentId — one card often has multiple links
+    // (media image link, details link, buy-now button). We want only the
+    // media link so the overlay appears over the image, not the details area.
+    const byMomentId = new Map();
     for (const link of links) {
       const ids = this.parseHref(link.href);
       if (!ids) continue;
-      if (seen.has(link)) continue;
-      seen.add(link);
+      if (!byMomentId.has(ids.momentId)) byMomentId.set(ids.momentId, []);
+      byMomentId.get(ids.momentId).push(link);
+    }
 
-      const playerName = this.findPlayerName(link);
-      const listingPrice = this.findPrice(link);
+    for (const [momentId, candidates] of byMomentId) {
+      // Prefer a link that wraps an img or video (the media area)
+      const mediaLink = candidates.find(l => l.querySelector('img, video'));
+      // Fall back to first non-buy-now link
+      const target = mediaLink
+        || candidates.find(l => !this.isBuyNowLink(l))
+        || candidates[0];
+
+      if (!target || seen.has(target)) continue;
+      seen.add(target);
+
+      const playerName = this.findPlayerName(target);
+      const listingPrice = this.findPrice(target);
 
       results.push({
-        element: link,
-        editionId: ids.momentId,
+        element: target,
+        editionId: momentId,
         playerName,
         listingPrice,
       });
     }
 
     return results;
+  }
+
+  isBuyNowLink(link) {
+    const text = (link.textContent || '').toLowerCase().trim();
+    return text.includes('buy now') || text.includes('select and buy') || text.includes('make offer');
   }
 
   findPlayerName(element) {

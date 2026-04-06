@@ -26,6 +26,10 @@ function getFromCache(key) {
 }
 
 function setInCache(key, value, ttl) {
+  // Evict oldest entry if cache grows too large (~50MB risk at scale)
+  if (cache.size >= 20) {
+    cache.delete(cache.keys().next().value);
+  }
   cache.set(key, { value, expiry: Date.now() + ttl });
 }
 

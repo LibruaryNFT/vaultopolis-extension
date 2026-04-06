@@ -20,6 +20,7 @@
     }
 
     .logo-full { height: 24px; width: auto; }
+    .version { margin-left: auto; font-size: 10px; color: #4b4b6b; }
     .subtitle { color: #8b8bab; font-size: 11px; margin-bottom: 14px; }
 
     .toggle-row {
@@ -68,25 +69,25 @@
     }
     .social-link:hover { color: #6366f1; }
 
-    .oss-badge {
-      margin-top: 10px; padding: 6px 8px;
-      background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2);
-      border-radius: 6px; font-size: 10px; color: #8b8bab; text-align: center;
-    }
-    .oss-icon { font-size: 11px; }
-    .oss-link { color: #6366f1; text-decoration: none; }
-    .oss-link:hover { color: #8b5cf6; text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="header">
     <img class="logo-full" src="/assets/logo.svg" alt="Vaultopolis" id="logo">
+    <span class="version" id="version"></span>
   </div>
   <div class="subtitle">Market analytics for Top Shot, All Day, and Pinnacle</div>
 
+  <div class="section-label">Analytics</div>
+
   <div class="toggle-row">
-    <div><div class="toggle-label">Analytics overlay</div></div>
+    <div><div class="toggle-label">Hover tooltip</div><div class="toggle-desc">Show analytics when hovering a card</div></div>
     <label class="toggle"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
+  </div>
+
+  <div class="toggle-row">
+    <div><div class="toggle-label">Always-on overlay</div><div class="toggle-desc">Permanent analytics on every visible card</div></div>
+    <label class="toggle"><input type="checkbox" id="alwaysOn"><span class="slider"></span></label>
   </div>
 
   <div class="section-label">Performance</div>
@@ -102,14 +103,6 @@
   <div class="toggle-row">
     <div><div class="toggle-label">Hide all card media</div><div class="toggle-desc">Hide moment videos and images</div></div>
     <label class="toggle"><input type="checkbox" id="blockAllMedia"><span class="slider"></span></label>
-  </div>
-
-  <a class="link" href="https://vaultopolis.com" target="_blank" rel="noopener">
-    Open Vaultopolis Dashboard
-  </a>
-
-  <div class="oss-badge">
-    <span class="oss-icon">&#128275;</span> Open source — <a class="oss-link" href="https://github.com/LibruaryNFT/vaultopolis-extension" target="_blank" rel="noopener">view source code</a>
   </div>
 
   <div class="social-row">
