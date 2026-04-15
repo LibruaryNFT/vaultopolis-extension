@@ -101,22 +101,12 @@ export class CardBadge {
 
     let ed = null;
     try {
-      if (setUuid && playUuid) {
-        const resp = await chrome.runtime.sendMessage({
-          action: 'resolveAndLookup', setUuid, playUuid, parallelID, listingPrice
-        });
-        if (resp?.success) ed = resp.data;
-      }
-      if (!ed && setId && playId) {
-        const resp = await chrome.runtime.sendMessage({ action: 'lookupEdition', setId, playId });
-        if (resp?.success) ed = resp.data;
-      }
-      if (!ed && editionId) {
-        const resp = await chrome.runtime.sendMessage({
-          action: 'lookupByEditionId', editionId, product: this.product
-        });
-        if (resp?.success) ed = resp.data;
-      }
+      const resp = await chrome.runtime.sendMessage({
+        action: 'lookupOne',
+        market: this.product,
+        setUuid, playUuid, setId, playId, parallelID, editionId,
+      });
+      if (resp?.success) ed = resp.data;
     } catch { return; }
 
     if (!ed || !this.enabled || !el.isConnected) return;
@@ -202,7 +192,7 @@ export class CardBadge {
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
-      z-index: 9999;
+      z-index: 1;
       border-radius: 6px 6px 0 0;
       transition: opacity 0.2s;
       visibility: visible !important;
@@ -255,7 +245,7 @@ export class CardBadge {
       font-size: 10px; font-weight: 600;
       cursor: pointer; padding: 4px 8px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      z-index: 10000; display: none; line-height: 1;
+      z-index: 2; display: none; line-height: 1;
       backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     `;
     overlay._restoreBtn = restoreBtn;

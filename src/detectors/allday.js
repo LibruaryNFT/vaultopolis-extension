@@ -41,14 +41,18 @@ export class AllDayDetector {
         || candidates.find(l => !this.isBuyNowLink(l))
         || candidates[0];
 
-      if (!target || seen.has(target)) continue;
-      seen.add(target);
+      if (!target) continue;
 
-      const playerName = this.findPlayerName(target);
-      const listingPrice = this.findPrice(target);
+      // Walk up to the visual card container (Chakra LinkBox or ancestor with real dimensions)
+      const card = this.findCardContainer(target);
+      if (seen.has(card)) continue;
+      seen.add(card);
+
+      const playerName = this.findPlayerName(card);
+      const listingPrice = this.findPrice(card);
 
       results.push({
-        element: target,
+        element: card,
         editionId: momentId,
         playerName,
         listingPrice,
@@ -56,6 +60,22 @@ export class AllDayDetector {
     }
 
     return results;
+  }
+
+  /**
+   * Walk up from <a> to the visual card container.
+   */
+  findCardContainer(link) {
+    const linkbox = link.closest('.chakra-linkbox');
+    if (linkbox) return linkbox;
+
+    let el = link.parentElement;
+    for (let i = 0; i < 6 && el; i++) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 100 && rect.height > 100) return el;
+      el = el.parentElement;
+    }
+    return link;
   }
 
   isBuyNowLink(link) {

@@ -26,14 +26,18 @@ export class PinnacleDetector {
     for (const link of links) {
       const ids = this.parseHref(link.href);
       if (!ids) continue;
-      if (seen.has(link)) continue;
-      seen.add(link);
 
-      const pinName = this.findPinName(link);
-      const listingPrice = this.findPrice(link);
+      // Pinnacle may also use Chakra LinkBox (0x0 overlay links).
+      // Walk up to the visual card container for hover detection.
+      const card = this.findCardContainer(link);
+      if (seen.has(card)) continue;
+      seen.add(card);
+
+      const pinName = this.findPinName(card);
+      const listingPrice = this.findPrice(card);
 
       results.push({
-        element: link,
+        element: card,
         editionId: ids.pinId,
         playerName: pinName, // reuse field name for API compat
         listingPrice,
@@ -41,6 +45,23 @@ export class PinnacleDetector {
     }
 
     return results;
+  }
+
+  /**
+   * Walk up from <a> to the visual card container.
+   * Tries .chakra-linkbox first, then first ancestor with real dimensions.
+   */
+  findCardContainer(link) {
+    const linkbox = link.closest('.chakra-linkbox');
+    if (linkbox) return linkbox;
+
+    let el = link.parentElement;
+    for (let i = 0; i < 6 && el; i++) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 80 && rect.height > 80) return el;
+      el = el.parentElement;
+    }
+    return link;
   }
 
   findPinName(element) {

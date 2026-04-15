@@ -5,11 +5,10 @@ document.getElementById('logo').src = chrome.runtime.getURL('assets/logo.svg');
 const { version } = chrome.runtime.getManifest();
 document.getElementById('version').textContent = `v${version}`;
 
-const ALL_KEYS = ['enabled', 'alwaysOn', 'blockVideos', 'reduceImages', 'blockAllMedia'];
+const ALL_KEYS = ['enabled', 'blockVideos', 'reduceImages', 'blockAllMedia'];
 
 const DEFAULTS = {
   enabled: true,
-  alwaysOn: false,
   blockVideos: false,
   reduceImages: false,
   blockAllMedia: false,

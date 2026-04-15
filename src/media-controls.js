@@ -6,9 +6,9 @@
 
 const SITE_SELECTORS = {
   topshot: {
-    videos: '.card-content video, a[href*="/listings/"] video',
-    // Exclude badge/icon images (small avatars, SVG icons, tier badges)
-    images: 'a[href*="/listings/"] img:not([src*="badge"]):not([src*="icon"]):not([src*="tier"]):not([src*="avatar"]), .card-content img:not([src*="badge"]):not([src*="icon"])',
+    // TopShot now uses .chakra-linkbox as card container (not <a> links)
+    videos: '.chakra-linkbox video, a[href*="/listings/"] video',
+    images: '.chakra-linkbox img:not([src*="badge"]):not([src*="icon"]):not([src*="tier"]):not([src*="avatar"]):not([class*="avatar"]), a[href*="/listings/"] img:not([src*="badge"]):not([src*="icon"])',
   },
   allday: {
     videos: 'a[href*="/listing/moment/"] video, a[href*="/listing/moment/"] ~ video',
@@ -54,10 +54,10 @@ export class MediaControls {
         `${this.sel.images} { visibility: hidden !important; opacity: 0 !important; }
          ${this.sel.videos} { visibility: hidden !important; opacity: 0 !important; }`);
 
-      // Always restore visibility for our overlay content — media rules must never bleed in.
+      // Restore visibility for our pill/overlay content — media rules must never bleed in.
       this._setCSS('vp-overlay-restore', blockVideos || reduceImages || blockAll,
-        `.vp-always-overlay * { visibility: visible !important; }
-         .vp-restore-btn { visibility: visible !important; }`);
+        `.vp-pill, .vp-pill * { visibility: visible !important; opacity: 1 !important; image-rendering: auto !important; filter: none !important; }
+         .vp-pill-overlay, .vp-pill-overlay * { visibility: visible !important; opacity: 1 !important; image-rendering: auto !important; filter: none !important; }`);
 
       if (blockVideos) {
         this._killVideos();
