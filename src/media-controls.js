@@ -32,17 +32,28 @@ export class MediaControls {
     this.apply();
 
     chrome.storage.onChanged.addListener((changes) => {
-      if (changes.blockVideos || changes.reduceImages || changes.blockAllMedia) {
+      if (changes.mediaMode || changes.blockVideos || changes.reduceImages || changes.blockAllMedia || changes.pauseVideos) {
         this.apply();
       }
     });
   }
 
   apply() {
-    chrome.storage.local.get(['blockVideos', 'reduceImages', 'blockAllMedia'], (result) => {
-      const blockVideos = result.blockVideos || result.blockAllMedia || false;
-      const reduceImages = result.reduceImages || result.blockAllMedia || false;
-      const blockAll = result.blockAllMedia || false;
+    // Read new mediaMode enum; fall back to legacy boolean keys for users upgrading.
+    chrome.storage.local.get(['mediaMode', 'pauseVideos', 'blockVideos', 'reduceImages', 'blockAllMedia'], (result) => {
+      let mode = result.mediaMode || null;
+      if (!mode) {
+        // Legacy migration: derive mode from old boolean keys
+        if (result.blockAllMedia) mode = 'blockAll';
+        else if (result.blockVideos) mode = 'block';
+        else if (result.pauseVideos) mode = 'pause';
+        else mode = 'normal';
+      }
+
+      const pauseVideos = mode === 'pause';
+      const blockVideos = mode === 'block' || mode === 'blockAll';
+      const reduceImages = false; // removed from mediaMode — never silently degrade images
+      const blockAll = mode === 'blockAll';
 
       this._setCSS('vp-block-videos', blockVideos,
         `${this.sel.videos} { visibility: hidden !important; opacity: 0 !important; }`);
@@ -59,15 +70,20 @@ export class MediaControls {
         `.vp-pill, .vp-pill * { visibility: visible !important; opacity: 1 !important; image-rendering: auto !important; filter: none !important; }
          .vp-pill-overlay, .vp-pill-overlay * { visibility: visible !important; opacity: 1 !important; image-rendering: auto !important; filter: none !important; }`);
 
-      if (blockVideos) {
-        this._killVideos();
-        if (!this._mediaObs) {
-          this._mediaObs = new MutationObserver(() => this._killVideos());
-          this._mediaObs.observe(document.body, { childList: true, subtree: true });
-        }
-      } else if (this._mediaObs) {
+      const killActive = blockVideos || pauseVideos;
+      // Always disconnect first so toggling between blockVideos/pauseVideos doesn't
+      // leave a stale observer running alongside the new one
+      if (this._mediaObs) {
         this._mediaObs.disconnect();
         this._mediaObs = null;
+      }
+      if (killActive) {
+        this._killVideos();
+        this._mediaObs = new MutationObserver((mutations) => {
+          // Only re-scan if nodes were actually added (avoids re-querying on attr/text changes)
+          if (mutations.some(m => m.addedNodes.length > 0)) this._killVideos();
+        });
+        this._mediaObs.observe(document.body, { childList: true, subtree: true });
       }
     });
   }

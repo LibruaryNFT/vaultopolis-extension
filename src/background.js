@@ -27,7 +27,14 @@ const CACHE_TTL = {
 const DB_NAME = 'vaultopolisCache';
 const DB_VERSION = 3; // bumped: delete+recreate stores to clear stale data
 
+// Singleton IDB connection — re-opens once per SW lifecycle, reused for all subsequent calls
+let _dbPromise = null;
 function openDB() {
+  if (!_dbPromise) _dbPromise = _openDBRaw();
+  return _dbPromise;
+}
+
+function _openDBRaw() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
@@ -43,6 +50,7 @@ function openDB() {
     req.onerror = (e) => reject(e.target.error);
   });
 }
+
 
 async function idbGet(storeName, key) {
   const db = await openDB();
@@ -118,6 +126,21 @@ async function evictStaleDetails() {
 // Run eviction on SW startup
 evictStaleDetails();
 
+// ─── chrome.storage.session helpers (faster than IDB on cold start) ─────────
+// session storage survives SW termination but not browser restart — ideal for
+// derived caches that are cheap to rebuild from IDB on browser start.
+
+async function sessionGet(key) {
+  try {
+    const result = await chrome.storage.session.get(key);
+    return result[key] ?? null;
+  } catch { return null; }
+}
+
+async function sessionSet(key, value) {
+  try { await chrome.storage.session.set({ [key]: value }); } catch { /* ignore */ }
+}
+
 // ─── In-memory index (rebuilt from IDB on SW wake) ──────────────────────────
 
 const indexMaps = new Map(); // market → { lookup: Map, uuidLookup: Map, ts: number }
@@ -192,26 +215,38 @@ async function ensureIndex(market) {
 }
 
 async function _fetchIndex(market) {
-  // Check IndexedDB
-  const cached = await idbGet('indexes', market);
-  if (cached && Date.now() - cached.ts < CACHE_TTL.index) {
-    const { lookup, uuidLookup } = buildIndexLookup(cached.editions, market);
-    const entry = { lookup, uuidLookup, ts: cached.ts };
+  // 1. Check chrome.storage.session — fastest, survives SW restart
+  const session = await sessionGet(`index_${market}`);
+  if (session && Date.now() - session.ts < CACHE_TTL.index) {
+    const { lookup, uuidLookup, uuidSubLookup } = buildIndexLookup(session.editions, market);
+    const entry = { lookup, uuidLookup, uuidSubLookup, ts: session.ts };
     indexMaps.set(market, entry);
     return entry;
   }
 
-  // Fetch from API
+  // 2. Check IndexedDB — persists across browser restarts
+  const cached = await idbGet('indexes', market);
+  if (cached && Date.now() - cached.ts < CACHE_TTL.index) {
+    const { lookup, uuidLookup, uuidSubLookup } = buildIndexLookup(cached.editions, market);
+    const entry = { lookup, uuidLookup, uuidSubLookup, ts: cached.ts };
+    indexMaps.set(market, entry);
+    // Mirror to session so subsequent SW restarts skip IDB
+    sessionSet(`index_${market}`, { editions: cached.editions, ts: cached.ts });
+    return entry;
+  }
+
+  // 3. Fetch from API
   const data = await fetchJSON(`${API_BASE}/extension/v1/index/${market}`);
   const editions = data.editions || [];
   const ts = Date.now();
 
-  // Persist to IDB
+  // Persist to IDB + session
   await idbPut('indexes', { market, editions, ts });
+  sessionSet(`index_${market}`, { editions, ts });
 
   // Build in-memory lookup
-  const { lookup, uuidLookup } = buildIndexLookup(editions, market);
-  const entry = { lookup, uuidLookup, ts };
+  const { lookup, uuidLookup, uuidSubLookup } = buildIndexLookup(editions, market);
+  const entry = { lookup, uuidLookup, uuidSubLookup, ts };
   indexMaps.set(market, entry);
   return entry;
 }
@@ -240,18 +275,30 @@ function resolveEditionId(market, params) {
         if (subId) return subId;
       }
 
-      // If supply is known (from card text), match against subeditions by supply
+      // If supply is known (from card text), match against subeditions by supply.
+      // Use parallelHint (LE/RE/UE/CE/FE/GE badge detected on card) to disambiguate
+      // when multiple subeditions share the same supply count (e.g. standard /99 vs LE /99).
+      // Only filter in one direction: confirmed badge → skip standard.
+      // Never skip parallels based on absent badge (badge detection can fail).
       if (params.supply && params.supply > 0) {
-        // Find all subeditions for this UUID pair and match by supply
+        const isParallel = Boolean(params.parallelHint);
         for (const [key, edId] of idx.uuidSubLookup || []) {
           if (key.startsWith(uuidKey + '+')) {
             const ed = idx.lookup.get(edId);
-            if (ed && ed.sp === params.supply) return edId;
+            if (!ed || ed.sp !== params.supply) continue;
+            // Skip standard subedition only when we've confirmed a parallel badge
+            if (isParallel && (ed.sb === 0 || ed.sb === null)) continue;
+            return edId;
           }
         }
       }
 
-      // Fall back to default (standard subedition)
+      // Fall back to default (standard subedition).
+      // If the URL had a parallelID but matched nothing in uuidSubLookup (and
+      // supply matching also failed), return null rather than show the standard
+      // edition's data on what is clearly a parallel card.
+      if (params.parallelID != null && params.parallelID !== '') return null;
+
       const edId = idx.uuidLookup.get(uuidKey);
       if (edId) return edId;
     }
@@ -271,7 +318,7 @@ function resolveEditionId(market, params) {
   return null;
 }
 
-const pendingDetailFetches = new Map(); // "market:id1,id2" → Promise
+const pendingDetailFetches = new Map(); // "market:editionId" → Promise<Map>
 
 async function fetchDetails(market, editionIds) {
   if (editionIds.length === 0) return new Map();
@@ -353,7 +400,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const edId = resolveEditionId(market, request);
       if (!edId) return sendResponse({ success: true, data: null });
 
-      const results = await fetchDetails(market, [edId]);
+      // Deduplicate concurrent fetches for the same edition
+      const pendingKey = `${market}:${edId}`;
+      let fetchPromise = pendingDetailFetches.get(pendingKey);
+      if (!fetchPromise) {
+        fetchPromise = fetchDetails(market, [edId]);
+        pendingDetailFetches.set(pendingKey, fetchPromise);
+        fetchPromise.finally(() => pendingDetailFetches.delete(pendingKey));
+      }
+      const results = await fetchPromise;
       sendResponse({ success: true, data: results.get(edId) || null, editionId: edId });
     }).catch(err => sendResponse({ success: false, error: err.message }));
     return true;
@@ -363,16 +418,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'lookupBatch') {
     const ids = request.ids || [];
     ensureIndex(market).then(async () => {
-      // Resolve all IDs
-      const resolvedIds = ids
-        .map(params => resolveEditionId(market, params))
-        .filter(Boolean);
+      // Resolve all IDs — preserve index alignment (no filter here)
+      const resolvedIds = ids.map(params => resolveEditionId(market, params));
 
-      const results = await fetchDetails(market, [...new Set(resolvedIds)]);
+      // Fetch only the non-null unique IDs
+      const uniqueIds = [...new Set(resolvedIds.filter(Boolean))];
+      const results = await fetchDetails(market, uniqueIds);
 
-      // Return as array matched to input order
+      // Return as array matched to input order using the aligned resolvedIds
       const response = ids.map((params, i) => {
-        const edId = resolvedIds[i] || resolveEditionId(market, params);
+        const edId = resolvedIds[i];
         return { params, editionId: edId, data: edId ? results.get(edId) || null : null };
       });
 
@@ -424,4 +479,17 @@ chrome.runtime.onInstalled.addListener(() => {
   // Don't block — just warm in background
   ensureIndex('topshot').catch(() => {});
   ensureIndex('pinnacle').catch(() => {});
+});
+
+// ─── SW keepalive (Chrome MV3) ──────────────────────────────────────────────
+// MV3 service workers terminate after ~30s of inactivity, clearing in-memory
+// state and causing cold-start latency. A 30s alarm (periodInMinutes: 0.5,
+// requires Chrome 120+) wakes the SW before it can terminate, keeping the
+// IDB connection warm and session cache populated.
+chrome.alarms.create('vp_keepalive', { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'vp_keepalive') {
+    // Touch IDB to keep connection warm
+    openDB().catch(() => {});
+  }
 });

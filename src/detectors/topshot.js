@@ -118,12 +118,39 @@ export class TopShotDetector {
       }
     }
 
-    // Try combining consecutive fragments (e.g. "Nikola" + "Jokić")
-    for (let i = 0; i < fragments.length - 1; i++) {
-      const combined = fragments[i] + ' ' + fragments[i + 1];
-      if (this.looksLikePlayerName(combined)) return combined;
+    // Try combining 2, 3, and 4 consecutive fragments.
+    // Covers bigrams ("Nikola Jokić"), trigrams ("Karl-Anthony Towns" split across 3 nodes),
+    // and quads ("Shai Gilgeous-Alexander" in edge cases).
+    for (let size = 2; size <= 4; size++) {
+      for (let i = 0; i <= fragments.length - size; i++) {
+        const combined = fragments.slice(i, i + size).join(' ');
+        if (this.looksLikePlayerName(combined)) return combined;
+      }
     }
 
+    return null;
+  }
+
+  /**
+   * Detect if this card is a parallel subedition (LE, RE, UE, CE, FE, GE badge).
+   * Uses full textContent regex — same patterns as findSupply — since the badge
+   * may be embedded within a larger text node rather than standing alone.
+   * Returns 'LE'/'RE'/etc. if found, null otherwise.
+   */
+  findParallelHint(element) {
+    const text = element.textContent || '';
+    // "LE /99" — badge before slash-number
+    const before = text.match(/\b(LE|RE|UE|CE|FE|GE)\s*\/\s*\d/);
+    if (before) return before[1];
+    // "/99 LE" — badge after slash-number
+    const after = text.match(/\/\s*\d[\d,]*\s*(LE|RE|UE|CE|FE|GE)\b/);
+    if (after) return after[1];
+    // Standalone text node fallback (badge as isolated element)
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const t = walker.currentNode.textContent.trim();
+      if (/^(LE|RE|UE|CE|FE|GE)$/.test(t)) return t;
+    }
     return null;
   }
 
@@ -140,16 +167,45 @@ export class TopShotDetector {
 
   /**
    * Extract supply count from card text.
-   * TopShot cards show "Supply: 2,654" or "/2666" (tier/supply format).
+   * TopShot formats observed:
+   *   "Supply: 2,654"          — profile/collection cards
+   *   "Metallic Gold LE /99"   — parallel badge (tier abbrev BEFORE slash-number)
+   *   "Common /99 LE"          — alternate order (slash-number BEFORE abbrev)
+   *   "Fandom/2666"            — no space before slash
+   *   "Burned: 0 Supply: 94"   — after burns
+   *   "/ 99"                   — bare slash-number (SVG icon stripped, parallel badge)
    */
   findSupply(element) {
     const text = element.textContent || '';
-    // Match "Supply: 2,654" or "Supply:2654"
+
+    // 1. "Supply: N" — explicit label (most reliable, always first)
     const supplyMatch = text.match(/Supply:\s*([\d,]+)/);
     if (supplyMatch) return parseInt(supplyMatch[1].replace(/,/g, ''), 10);
-    // Match "/2666" (tier badge format like "Fandom/2666")
-    const slashMatch = text.match(/\/([\d,]+)\s*(?:LE|RE|UE|CE|FE|GE)/);
-    if (slashMatch) return parseInt(slashMatch[1].replace(/,/g, ''), 10);
+
+    // 2. "Metallic Gold LE /99" — tier abbrev before slash-number
+    const beforeMatch = text.match(/(?:LE|RE|UE|CE|FE|GE)\s*\/\s*([\d,]+)/);
+    if (beforeMatch) return parseInt(beforeMatch[1].replace(/,/g, ''), 10);
+
+    // 3. "Common /99 LE" or "Fandom/2666 LE" — slash-number before tier abbrev
+    const afterMatch = text.match(/\/\s*([\d,]+)\s*(?:LE|RE|UE|CE|FE|GE)/);
+    if (afterMatch) return parseInt(afterMatch[1].replace(/,/g, ''), 10);
+
+    // 4. Context-anchored serial/supply widget: "serial/supply" — the "/" is owned
+    //    by the Top Shot supply widget. Pre-scrub prices, hash-prefixed serials, ISO
+    //    dates, and stat suffixes so they don't poison the match.
+    //    No magnitude cap — Vortex (2500), Rippled (4000), Commons (60000) are valid.
+    const cleaned = text
+      .replace(/\$[\d,]+(?:\.\d{2})?/g, '')                      // prices: $12.99
+      .replace(/#\s*\d{1,6}/g, '')                               // serials: #1,234
+      .replace(/\b(19|20)\d{2}\b/g, '')                          // years: 2024
+      .replace(/\d+\s*(?:pts|reb|ast|blk|stl|%|BPS|min)\b/gi, ''); // stats
+
+    const slashWidget = cleaned.match(/\b\d[\d,]*\s*\/\s*([\d,]+\+?)/);
+    if (slashWidget) {
+      const n = parseInt(slashWidget[1].replace(/,/g, ''), 10);
+      if (n >= 1) return n;
+    }
+
     return null;
   }
 
@@ -189,7 +245,7 @@ export class TopShotDetector {
       if (qSetId && qPlayId) return { setId: qSetId, playId: qPlayId };
 
       // parallelID query param (maps to subedition)
-      const parallelID = url.searchParams.get('parallelID') || null;
+      const parallelID = url.searchParams.get('parallelID') || url.searchParams.get('parallel') || null;
 
       // Path: /listings/p2p/{setUuid}+{playUuid} (current format — UUIDs)
       const uuidMatch = url.pathname.match(/\/(?:listings\/p2p|edition)\/([\w-]{36})\+([\w-]{36})/);

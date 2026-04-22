@@ -54,6 +54,43 @@
       letter-spacing: 1px; color: #6b7280; margin-top: 10px; margin-bottom: 2px;
     }
 
+    /* Segmented control — 4 media modes */
+    .seg-desc {
+      font-size: 10px;
+      color: #6b7280;
+      margin-bottom: 6px;
+      border-top: 1px solid #2d2d4a;
+      padding-top: 6px;
+    }
+
+    .seg-ctrl {
+      display: flex;
+      background: #0f0f1f;
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+      margin-bottom: 8px;
+      border: 1px solid #2d2d4a;
+    }
+
+    .seg-btn {
+      flex: 1;
+      padding: 6px 2px;
+      border: none;
+      background: none;
+      color: #6b7280;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+
+    .seg-btn:hover { color: #a5b4fc; }
+    .seg-btn.active { background: #6366f1; color: #fff; }
+
     .social-row {
       display: flex; justify-content: center; gap: 16px;
       margin-top: 8px; padding-top: 8px; border-top: 1px solid #2d2d4a;
@@ -79,19 +116,14 @@
     <label class="toggle"><input type="checkbox" id="enabled" checked><span class="slider"></span></label>
   </div>
 
-  <div class="section-label">Performance</div>
+  <div class="section-label">Media Performance</div>
 
-  <div class="toggle-row">
-    <div><div class="toggle-label">Block moment videos</div><div class="toggle-desc">Stop autoplay on card hover</div></div>
-    <label class="toggle"><input type="checkbox" id="blockVideos"><span class="slider"></span></label>
-  </div>
-  <div class="toggle-row">
-    <div><div class="toggle-label">Reduce moment images</div><div class="toggle-desc">Lower quality card images</div></div>
-    <label class="toggle"><input type="checkbox" id="reduceImages"><span class="slider"></span></label>
-  </div>
-  <div class="toggle-row">
-    <div><div class="toggle-label">Hide all card media</div><div class="toggle-desc">Hide moment videos and images</div></div>
-    <label class="toggle"><input type="checkbox" id="blockAllMedia"><span class="slider"></span></label>
+  <div class="seg-desc">Controls how card videos and images load</div>
+  <div class="seg-ctrl">
+    <button class="seg-btn" data-mode="normal">Normal</button>
+    <button class="seg-btn" data-mode="pause">Pause<br>Videos</button>
+    <button class="seg-btn" data-mode="block">Hide<br>Videos</button>
+    <button class="seg-btn" data-mode="blockAll">Hide<br>All</button>
   </div>
 
   <div class="social-row">

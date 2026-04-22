@@ -14,6 +14,16 @@ function escAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Validate that a URL uses http or https — returns null for any other scheme */
+function safeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export class CardPill {
   constructor(product) {
     this.product = product;
@@ -47,14 +57,14 @@ export class CardPill {
     if (this.pills.has(el)) return;
 
     // Fetch floor price from the index (instant, no API call needed)
-    const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply } = el._vpData;
+    const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
 
     let indexData = null;
     try {
       const resp = await chrome.runtime.sendMessage({
         action: 'indexLookup',
         market: this.product,
-        setUuid, playUuid, setId, playId, parallelID, editionId, supply,
+        setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
       });
       if (resp?.success) indexData = resp.data;
     } catch { /* ignore */ }
@@ -104,7 +114,7 @@ export class CardPill {
     `;
 
     const vIcon = document.createElement('img');
-    vIcon.src = 'https://storage.googleapis.com/vaultopolis/VaultopolisIcon.svg';
+    vIcon.src = this.logoUrl;
     vIcon.style.cssText = 'height: 14px; width: 14px; flex-shrink: 0; pointer-events: none;';
     vIcon.alt = 'V';
 
@@ -160,9 +170,15 @@ export class CardPill {
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(10, 10, 24, 0.96);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: linear-gradient(
+        to bottom,
+        rgba(10, 10, 24, 0.93) 0%,
+        rgba(10, 10, 24, 0.55) 38%,
+        rgba(10, 10, 24, 0.55) 62%,
+        rgba(10, 10, 24, 0.93) 100%
+      );
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 13px;
       color: #e0e0e0;
@@ -181,12 +197,12 @@ export class CardPill {
 
     // Loading state
     overlay.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;background:rgba(10,10,24,0.5);border-radius:4px;padding:2px 4px">
         <img src="${this.logoUrl}" style="height:14px;width:auto" alt="Vaultopolis">
         <button class="vp-pill-close" style="background:none;border:none;color:#8b8bab;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;font-family:inherit">&times;</button>
       </div>
       <div class="vp-pill-body" style="flex:1;display:flex;align-items:center;justify-content:center">
-        <div style="color:#6366f1;font-size:12px">Loading analytics...</div>
+        <div style="color:#6366f1;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,0.9)">Loading analytics...</div>
       </div>
     `;
 
@@ -219,12 +235,12 @@ export class CardPill {
     }
 
     // Fetch full details
-    const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply } = el._vpData;
+    const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
     try {
       const resp = await chrome.runtime.sendMessage({
         action: 'lookupOne',
         market: this.product,
-        setUuid, playUuid, setId, playId, parallelID, editionId, supply,
+        setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
       });
 
       if (!state.expanded) return; // collapsed while loading
@@ -262,9 +278,9 @@ export class CardPill {
     const fmt = v => (v != null && v > 0) ? `$${parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
     const row = (label, value) =>
       value != null && value !== ''
-        ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(45,45,74,0.5)">
-             <span style="color:#8b8bab;font-size:12px">${label}</span>
-             <span style="font-weight:600;font-size:13px;color:#e0e0e0">${value}</span>
+        ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(45,45,74,0.4);text-shadow:0 1px 3px rgba(0,0,0,0.9)">
+             <span style="color:#b0b3c8;font-size:12px">${label}</span>
+             <span style="font-weight:600;font-size:13px;color:#f0f0f0">${value}</span>
            </div>`
         : '';
 
@@ -325,34 +341,42 @@ export class CardPill {
       return `https://vaultopolis.com/analytics/topshot/edition/${sId}/${pId}`;
     })();
 
+    const panelStyle = 'flex:1;overflow-y:auto;padding:2px 0;background:rgba(10,10,24,0.35);border-radius:0 0 4px 4px';
     const body = overlay.querySelector('.vp-pill-body');
     body.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
+
+    // Pre-render all 3 panels upfront — tab switching only toggles display,
+    // no innerHTML writes on click (avoids repeated DOM thrash and XSS surface).
     body.innerHTML = `
-      <div style="display:flex;gap:0;border-bottom:1px solid rgba(45,45,74,0.8);margin-bottom:2px">
-        <button class="vp-pill-tab vp-pill-tab-active" data-tab="price" style="flex:1;padding:5px 0;border:none;background:none;color:#6366f1;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #6366f1;margin-bottom:-1px;font-family:inherit">Price</button>
-        <button class="vp-pill-tab" data-tab="supply" style="flex:1;padding:5px 0;border:none;background:none;color:#6b7280;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit">Supply</button>
-        <button class="vp-pill-tab" data-tab="offers" style="flex:1;padding:5px 0;border:none;background:none;color:#6b7280;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit">Offers</button>
+      <div style="display:flex;gap:0;border-bottom:1px solid rgba(45,45,74,0.8);margin-bottom:2px;background:rgba(10,10,24,0.45);border-radius:4px 4px 0 0">
+        <button class="vp-pill-tab vp-pill-tab-active" data-tab="price" style="flex:1;padding:5px 0;border:none;background:none;color:#6366f1;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #6366f1;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Price</button>
+        <button class="vp-pill-tab" data-tab="supply" style="flex:1;padding:5px 0;border:none;background:none;color:#9ca3af;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Supply</button>
+        <button class="vp-pill-tab" data-tab="offers" style="flex:1;padding:5px 0;border:none;background:none;color:#9ca3af;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Offers</button>
       </div>
-      <div class="vp-pill-content" style="flex:1;overflow-y:auto;padding:2px 0">${tabs.price}</div>
+      <div class="vp-pill-panel" data-panel="price" style="${panelStyle};display:block">${tabs.price}</div>
+      <div class="vp-pill-panel" data-panel="supply" style="${panelStyle};display:none">${tabs.supply}</div>
+      <div class="vp-pill-panel" data-panel="offers" style="${panelStyle};display:none">${tabs.offers}</div>
       <div style="display:flex;gap:6px;padding-top:6px;border-top:1px solid rgba(45,45,74,0.6);margin-top:4px;flex-shrink:0">
-        ${listingUrl ? `<a href="${escAttr(listingUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:#6366f1;color:#fff;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">View Listing</a>` : ''}
-        <a href="${escAttr(analyticsUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:transparent;color:#6366f1;border:1px solid rgba(99,102,241,0.6);border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">Full Analytics</a>
+        ${safeUrl(listingUrl) ? `<a href="${escAttr(listingUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(99,102,241,0.9);color:#fff;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">View Listing</a>` : ''}
+        <a href="${escAttr(analyticsUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(10,10,24,0.6);color:#a5b4fc;border:1px solid rgba(99,102,241,0.6);border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">Full Analytics</a>
       </div>
     `;
 
-    // Tab switching
+    // Tab switching — show/hide pre-rendered panels, no innerHTML writes
     body.querySelectorAll('.vp-pill-tab').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const tabName = btn.dataset.tab;
         body.querySelectorAll('.vp-pill-tab').forEach(b => {
-          b.style.color = '#6b7280';
+          b.style.color = '#9ca3af';
           b.style.borderBottomColor = 'transparent';
         });
         btn.style.color = '#6366f1';
         btn.style.borderBottomColor = '#6366f1';
-        body.querySelector('.vp-pill-content').innerHTML = tabs[tabName];
+        body.querySelectorAll('.vp-pill-panel').forEach(p => {
+          p.style.display = p.dataset.panel === tabName ? 'block' : 'none';
+        });
       });
     });
   }
