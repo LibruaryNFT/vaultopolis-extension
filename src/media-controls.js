@@ -4,20 +4,24 @@
  * Selectors are site-aware — each marketplace has different DOM structure.
  */
 
+// .vp-icon is the Vaultopolis logo img inside the pill badge.
+// It must never be caught by image blocking rules — always exclude it.
+const VP_ICON_EXCL = ':not(.vp-icon)';
+
 const SITE_SELECTORS = {
   topshot: {
     // TopShot now uses .chakra-linkbox as card container (not <a> links)
     videos: '.chakra-linkbox video, a[href*="/listings/"] video',
-    images: '.chakra-linkbox img:not([src*="badge"]):not([src*="icon"]):not([src*="tier"]):not([src*="avatar"]):not([class*="avatar"]), a[href*="/listings/"] img:not([src*="badge"]):not([src*="icon"])',
+    images: `.chakra-linkbox img${VP_ICON_EXCL}:not([src*="badge"]):not([src*="icon"]):not([src*="tier"]):not([src*="avatar"]):not([class*="avatar"]), a[href*="/listings/"] img${VP_ICON_EXCL}:not([src*="badge"]):not([src*="icon"])`,
   },
   allday: {
     videos: 'a[href*="/listing/moment/"] video, a[href*="/listing/moment/"] ~ video',
     // Exclude .chakra-avatar__img (Hall of Fame, badges etc) and SVG badge icons
-    images: 'a[href*="/listing/moment/"] img:not(.chakra-avatar__img):not([src*="badge"]):not([src*="icon"]), a[href*="/listing/moment/"] picture img:not(.chakra-avatar__img)',
+    images: `a[href*="/listing/moment/"] img${VP_ICON_EXCL}:not(.chakra-avatar__img):not([src*="badge"]):not([src*="icon"]), a[href*="/listing/moment/"] picture img${VP_ICON_EXCL}:not(.chakra-avatar__img)`,
   },
   pinnacle: {
     videos: 'a[href*="/pin/"] video, a[href*="/collectible/"] video',
-    images: 'a[href*="/pin/"] img:not([src*="badge"]):not([src*="icon"]):not([src*="avatar"]), a[href*="/collectible/"] img:not([src*="badge"]):not([src*="icon"]):not([src*="avatar"])',
+    images: `a[href*="/pin/"] img${VP_ICON_EXCL}:not([src*="badge"]):not([src*="icon"]):not([src*="avatar"]), a[href*="/collectible/"] img${VP_ICON_EXCL}:not([src*="badge"]):not([src*="icon"]):not([src*="avatar"])`,
   },
 };
 

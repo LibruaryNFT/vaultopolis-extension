@@ -115,6 +115,7 @@ export class CardPill {
 
     const vIcon = document.createElement('img');
     vIcon.src = this.logoUrl;
+    vIcon.className = 'vp-icon'; // excluded from media-controls image blocking selectors
     vIcon.style.cssText = 'height: 14px; width: 14px; flex-shrink: 0; pointer-events: none;';
     vIcon.alt = 'V';
 
