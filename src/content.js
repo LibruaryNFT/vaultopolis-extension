@@ -38,9 +38,13 @@ class VaultopolisOverlay {
       this.watchNavigation();
       this.watchDOM();
 
+      console.log('[VP:TopShot] content script active on', window.location.href);
+
       // Initial scans — cards load async via GraphQL
       setTimeout(() => this.scanPage(), 3000);
       setTimeout(() => this.scanPage(), 6000);
+      setTimeout(() => this.scanPage(), 12000);
+      setTimeout(() => this.scanPage(), 20000);
     });
 
     chrome.storage.onChanged.addListener((changes) => {
@@ -80,7 +84,8 @@ class VaultopolisOverlay {
     const observer = new MutationObserver((mutations) => {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(() => {
-        if (mutations.some(m => m.addedNodes.length > 0)) {
+        const isVpNode = n => n.nodeType === 1 && /\bvp-pill/.test(n.className || '');
+        if (mutations.some(m => m.addedNodes.length > 0 && [...m.addedNodes].some(n => !isVpNode(n)))) {
           this.scanPage();
         }
       }, 500);

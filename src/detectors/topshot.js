@@ -40,6 +40,7 @@ export class TopShotDetector {
     const links = document.querySelectorAll('a[href*="/listings/p2p/"], a[href*="/edition/"]');
 
     for (const link of links) {
+      if (link.closest('.vp-pill-overlay')) continue;
       const ids = this.parseHref(link.href);
       if (!ids) continue;
 
@@ -67,6 +68,11 @@ export class TopShotDetector {
       });
     }
 
+    console.log(`[VP:TopShot] scan — links found: ${links.length}, cards resolved: ${results.length}, url: ${window.location.pathname}`);
+    if (results.length > 0) {
+      const f = results[0];
+      console.log(`[VP:TopShot] First card — id: ${f.setId || f.setUuid}, name: ${f.playerName}, price: ${f.listingPrice}`);
+    }
     return results;
   }
 

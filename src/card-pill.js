@@ -30,6 +30,7 @@ export class CardPill {
     this.observer = null;
     this.pills = new WeakMap();  // element → { pill, overlay, expanded }
     this.logoUrl = chrome.runtime.getURL('assets/logo.svg');
+    this.iconUrl = chrome.runtime.getURL('assets/VaultopolisIcon.svg');
   }
 
   init() {
@@ -56,34 +57,14 @@ export class CardPill {
     if (!el._vpData) return;
     if (this.pills.has(el)) return;
 
-    // Fetch floor price from the index (instant, no API call needed)
     const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
 
-    let indexData = null;
-    try {
-      const resp = await chrome.runtime.sendMessage({
-        action: 'indexLookup',
-        market: this.product,
-        setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
-      });
-      if (resp?.success) indexData = resp.data;
-    } catch { /* ignore */ }
-
-    if (!el.isConnected) return;
-
-    // Prefer estimated value (unique to Vaultopolis), fall back to floor price
-    const ev = indexData?.ev;
-    const displayPrice = (ev != null && ev > 0) ? ev : (indexData?.fp ?? listingPrice);
-
-    // Don't show pill if we have no useful data
-    if (!displayPrice || displayPrice <= 0) return;
-
-    // Ensure card container is positioned
+    // ── Step 1: Position container and create pill immediately (synchronous) ──
+    // Don't await the API before creating DOM — React SPAs re-render elements
+    // during async waits, causing isConnected to be false when we try to append.
     const container = el;
-    const pos = getComputedStyle(container).position;
-    if (pos === 'static') container.style.position = 'relative';
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
 
-    // Create the pill badge
     const pill = document.createElement('div');
     pill.className = 'vp-pill';
     pill.style.cssText = `
@@ -97,7 +78,7 @@ export class CardPill {
       background: rgba(10, 10, 24, 0.75);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(99, 102, 241, 0.4);
+      border: 1px solid rgba(120, 120, 140, 0.35);
       border-radius: 16px;
       padding: 4px 8px 4px 5px;
       cursor: pointer;
@@ -114,25 +95,18 @@ export class CardPill {
     `;
 
     const vIcon = document.createElement('img');
-    vIcon.src = this.logoUrl;
-    vIcon.className = 'vp-icon'; // excluded from media-controls image blocking selectors
+    vIcon.src = this.iconUrl;
+    vIcon.className = 'vp-icon';
     vIcon.style.cssText = 'height: 14px; width: 14px; flex-shrink: 0; pointer-events: none;';
     vIcon.alt = 'V';
 
     const priceText = document.createElement('span');
-    priceText.textContent = displayPrice != null && displayPrice > 0
-      ? (() => {
-          const n = Number(displayPrice);
-          const hasCents = n % 1 !== 0;
-          return `$${n.toLocaleString(undefined, { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 })}`;
-        })()
-      : '--';
-    priceText.style.cssText = 'color: #a5b4fc; pointer-events: none;';
+    priceText.textContent = '--';
+    priceText.style.cssText = 'color: #7070a0; pointer-events: none;';
 
     pill.appendChild(vIcon);
     pill.appendChild(priceText);
 
-    // Hover feedback
     pill.addEventListener('mouseenter', () => {
       pill.style.transform = 'translateX(-50%) scale(1.08)';
       pill.style.boxShadow = '0 0 8px rgba(99, 102, 241, 0.5)';
@@ -142,24 +116,60 @@ export class CardPill {
       pill.style.boxShadow = 'none';
     });
 
-    // Create the expandable overlay (hidden by default)
     const overlay = this._createOverlay(el, listingUrl);
-
     const state = { pill, overlay, expanded: false };
     this.pills.set(el, state);
 
-    // Click to toggle
     pill.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (state.expanded) {
         this._collapse(state);
       } else {
+        pill.style.display = 'none';
         this._expand(el, state);
       }
     });
 
-    container.appendChild(pill);
+    try { container.appendChild(pill); } catch { this.pills.delete(el); return; }
+
+    // ── Step 2: Show DOM price immediately (grey) so pill is never blank ─────
+    if (listingPrice && listingPrice > 0) {
+      const n = Number(listingPrice);
+      priceText.textContent = `$${n.toLocaleString(undefined, { minimumFractionDigits: n % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`;
+      priceText.style.color = '#94a3b8';
+    }
+
+    // ── Step 3: Upgrade to index price (purple) when SW responds ─────────────
+    // 8s timeout covers SW cold-start (~3s) + index fetch (~1s) with headroom.
+    try {
+      const resp = await Promise.race([
+        chrome.runtime.sendMessage({
+          action: 'indexLookup',
+          market: this.product,
+          setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ]);
+      if (resp?.success && pill.isConnected) {
+        // Stash resolved editionId so _expand uses the fast direct-fetch path
+        // (the SW already does the complex subedition/UUID resolution here)
+        if (resp.editionId && !el._vpData.editionId) {
+          el._vpData.editionId = resp.editionId;
+        }
+        if (resp.data) {
+          const ev = resp.data.ev;
+          const fp = resp.data.fp;
+          const price = (ev != null && ev > 0) ? ev : fp;
+          if (price > 0) {
+            const n = Number(price);
+            priceText.textContent = `$${n.toLocaleString(undefined, { minimumFractionDigits: n % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`;
+            priceText.style.color = '#a5b4fc';
+            pill.style.borderColor = 'rgba(99, 102, 241, 0.4)';
+          }
+        }
+      }
+    } catch { /* keep DOM price */ }
   }
 
   _createOverlay(el, listingUrl) {
@@ -187,7 +197,7 @@ export class CardPill {
       box-sizing: border-box;
       display: none;
       flex-direction: column;
-      z-index: 10;
+      z-index: 20;
       pointer-events: auto;
       border-radius: 6px;
       opacity: 0;
@@ -199,7 +209,7 @@ export class CardPill {
     // Loading state
     overlay.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;background:rgba(10,10,24,0.5);border-radius:4px;padding:2px 4px">
-        <img src="${this.logoUrl}" style="height:14px;width:auto" alt="Vaultopolis">
+        <img src="${this.iconUrl}" style="height:14px;width:14px;flex-shrink:0" alt="V">
         <button class="vp-pill-close" style="background:none;border:none;color:#8b8bab;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;font-family:inherit">&times;</button>
       </div>
       <div class="vp-pill-body" style="flex:1;display:flex;align-items:center;justify-content:center">
@@ -235,30 +245,81 @@ export class CardPill {
       });
     }
 
-    // Fetch full details
-    const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
+    const { editionId, playerName, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
+
+    // ── Show DOM-scraped data immediately so overlay is never blank ───────────
+    const fmtListing = (v) => v ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: Number(v) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}` : null;
+    const rowStyle = 'display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(45,45,74,0.4);text-shadow:0 1px 3px rgba(0,0,0,0.9)';
+    const labelStyle = 'color:#b0b3c8;font-size:12px';
+    const valStyle = 'font-weight:600;font-size:13px;color:#f0f0f0';
+
+    let quickRows = '';
+    if (playerName && playerName !== 'null') quickRows += `<div style="${rowStyle}"><span style="${labelStyle}">Pin</span><span style="${valStyle}">${escAttr(String(playerName))}</span></div>`;
+    if (editionId) quickRows += `<div style="${rowStyle}"><span style="${labelStyle}">Edition</span><span style="${valStyle}">#${escAttr(String(editionId))}</span></div>`;
+    const lp = fmtListing(listingPrice);
+    if (lp) quickRows += `<div style="${rowStyle}"><span style="${labelStyle}">Listed</span><span style="font-weight:600;font-size:13px;color:#94a3b8">${escAttr(lp)}</span></div>`;
+
+    const body = overlay.querySelector('.vp-pill-body');
+    body.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;padding:2px 0;';
+    body.innerHTML = `
+      ${quickRows}
+      <div class="vp-loading-indicator" style="color:#6366f1;font-size:11px;margin-top:6px;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9)">Loading analytics...</div>
+    `;
+
+    // ── Fetch full details ────────────────────────────────────────────────────
+    // Content scripts can call fetch() cross-origin directly when the extension
+    // has host_permissions for the target origin (see manifest.json).
+    // This bypasses the MV3 service worker entirely, avoiding SW termination
+    // race conditions that cause sendResponse to silently drop.
+    //
+    // Direct fetch: use when editionId is already known (Pinnacle, AllDay).
+    // SW path: TopShot only — needs UUID→editionId resolution from the index.
     try {
-      const resp = await chrome.runtime.sendMessage({
-        action: 'lookupOne',
-        market: this.product,
-        setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
-      });
+      let resp;
+      if (editionId) {
+        // Direct fetch — no SW involved
+        const apiResp = await Promise.race([
+          fetch(`https://api.vaultopolis.com/extension/v1/details/${this.product}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [String(editionId)] }),
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+        ]);
+        if (!apiResp.ok) throw new Error(`HTTP ${apiResp.status}`);
+        const data = await apiResp.json();
+        const ed = (data.editions || [])[0] || null;
+        resp = { success: true, data: ed };
+      } else {
+        // SW path for TopShot (UUID resolution required)
+        resp = await Promise.race([
+          chrome.runtime.sendMessage({
+            action: 'lookupOne',
+            market: this.product,
+            setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+        ]);
+      }
 
       if (!state.expanded) return; // collapsed while loading
 
       if (resp?.success && resp.data) {
         this._renderDetails(overlay, resp.data, listingPrice, listingUrl);
-      } else {
-        overlay.querySelector('.vp-pill-body').innerHTML = `
-          <div style="color:#f87171;font-size:12px">Data not available</div>
-        `;
+        return;
       }
-    } catch {
-      if (state.expanded) {
-        overlay.querySelector('.vp-pill-body').innerHTML = `
-          <div style="color:#f87171;font-size:12px">Failed to load</div>
-        `;
-      }
+    } catch { /* fall through — show DOM data */ }
+
+    // ── Fallback: service worker timed out or unavailable — keep DOM data ─────
+    if (!state.expanded) return;
+    const loadingEl = body.querySelector('.vp-loading-indicator');
+    if (loadingEl) loadingEl.remove();
+
+    if (safeUrl(listingUrl)) {
+      const linkDiv = document.createElement('div');
+      linkDiv.style.cssText = 'display:flex;padding-top:6px;margin-top:4px;border-top:1px solid rgba(45,45,74,0.6);flex-shrink:0;';
+      linkDiv.innerHTML = `<a href="${escAttr(listingUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(99,102,241,0.9);color:#fff;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">View Listing</a>`;
+      body.appendChild(linkDiv);
     }
   }
 
@@ -346,17 +407,19 @@ export class CardPill {
     const body = overlay.querySelector('.vp-pill-body');
     body.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
 
-    // Pre-render all 3 panels upfront — tab switching only toggles display,
+    const showOffers = this.product !== 'pinnacle';
+
+    // Pre-render panels upfront — tab switching only toggles display,
     // no innerHTML writes on click (avoids repeated DOM thrash and XSS surface).
     body.innerHTML = `
       <div style="display:flex;gap:0;border-bottom:1px solid rgba(45,45,74,0.8);margin-bottom:2px;background:rgba(10,10,24,0.45);border-radius:4px 4px 0 0">
         <button class="vp-pill-tab vp-pill-tab-active" data-tab="price" style="flex:1;padding:5px 0;border:none;background:none;color:#6366f1;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #6366f1;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Price</button>
         <button class="vp-pill-tab" data-tab="supply" style="flex:1;padding:5px 0;border:none;background:none;color:#9ca3af;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Supply</button>
-        <button class="vp-pill-tab" data-tab="offers" style="flex:1;padding:5px 0;border:none;background:none;color:#9ca3af;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Offers</button>
+        ${showOffers ? `<button class="vp-pill-tab" data-tab="offers" style="flex:1;padding:5px 0;border:none;background:none;color:#9ca3af;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Offers</button>` : ''}
       </div>
       <div class="vp-pill-panel" data-panel="price" style="${panelStyle};display:block">${tabs.price}</div>
       <div class="vp-pill-panel" data-panel="supply" style="${panelStyle};display:none">${tabs.supply}</div>
-      <div class="vp-pill-panel" data-panel="offers" style="${panelStyle};display:none">${tabs.offers}</div>
+      ${showOffers ? `<div class="vp-pill-panel" data-panel="offers" style="${panelStyle};display:none">${tabs.offers}</div>` : ''}
       <div style="display:flex;gap:6px;padding-top:6px;border-top:1px solid rgba(45,45,74,0.6);margin-top:4px;flex-shrink:0">
         ${safeUrl(listingUrl) ? `<a href="${escAttr(listingUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(99,102,241,0.9);color:#fff;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">View Listing</a>` : ''}
         <a href="${escAttr(analyticsUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(10,10,24,0.6);color:#a5b4fc;border:1px solid rgba(99,102,241,0.6);border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">Full Analytics</a>

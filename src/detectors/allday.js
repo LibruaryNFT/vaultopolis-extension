@@ -27,6 +27,7 @@ export class AllDayDetector {
     // media link so the overlay appears over the image, not the details area.
     const byMomentId = new Map();
     for (const link of links) {
+      if (link.closest('.vp-pill-overlay')) continue;
       const ids = this.parseHref(link.href);
       if (!ids) continue;
       if (!byMomentId.has(ids.momentId)) byMomentId.set(ids.momentId, []);
@@ -59,6 +60,11 @@ export class AllDayDetector {
       });
     }
 
+    console.log(`[VP:AllDay] scan — links found: ${links.length}, cards resolved: ${results.length}, url: ${window.location.pathname}`);
+    if (results.length > 0) {
+      const f = results[0];
+      console.log(`[VP:AllDay] First card — id: ${f.editionId}, name: ${f.playerName}, price: ${f.listingPrice}`);
+    }
     return results;
   }
 
