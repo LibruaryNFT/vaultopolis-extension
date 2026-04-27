@@ -25,7 +25,7 @@ const CACHE_TTL = {
 // ─── IndexedDB helpers ──────────────────────────────────────────────────────
 
 const DB_NAME = 'vaultopolisCache';
-const DB_VERSION = 3; // bumped: delete+recreate stores to clear stale data
+const DB_VERSION = 4; // bumped: force re-fetch index after UUID map was null on server restart
 
 // Singleton IDB connection — re-opens once per SW lifecycle, reused for all subsequent calls
 let _dbPromise = null;

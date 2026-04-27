@@ -10,8 +10,10 @@ const VP_ICON_EXCL = ':not(.vp-icon)';
 
 const SITE_SELECTORS = {
   topshot: {
-    // TopShot now uses .chakra-linkbox as card container (not <a> links)
-    videos: '.chakra-linkbox video, a[href*="/listings/"] video',
+    // Broad selector — content script is already scoped to nbatopshot.com/* and MediaControls
+    // only runs on non-detail pages, so catching all videos is safe and covers homepage,
+    // drops page, and explore page which use different container structures than the marketplace.
+    videos: 'video',
     images: `.chakra-linkbox img${VP_ICON_EXCL}:not([src*="badge"]):not([src*="icon"]):not([src*="tier"]):not([src*="avatar"]):not([class*="avatar"]), a[href*="/listings/"] img${VP_ICON_EXCL}:not([src*="badge"]):not([src*="icon"])`,
   },
   allday: {
