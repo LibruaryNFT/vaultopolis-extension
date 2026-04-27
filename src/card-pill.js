@@ -37,9 +37,13 @@ export class CardPill {
     this._startObserver();
   }
 
-  /** Register a card element for pill rendering */
+  /** Register a card element for pill rendering.
+   * Unobserve first so recycled elements (same node, new content) re-trigger the IO. */
   observe(element) {
-    if (this.observer) this.observer.observe(element);
+    if (this.observer) {
+      this.observer.unobserve(element);
+      this.observer.observe(element);
+    }
   }
 
   _startObserver() {
@@ -55,9 +59,18 @@ export class CardPill {
 
   async _showPill(el) {
     if (!el._vpData) return;
-    if (this.pills.has(el)) return;
+    const { editionId } = el._vpData;
 
-    const { editionId, setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
+    // For recycled nodes (same DOM element, new content), clean up the stale pill.
+    const existing = this.pills.get(el);
+    if (existing) {
+      if (existing.editionId === editionId) return; // same content, already rendered
+      existing.pill.remove();
+      existing.overlay?.remove();
+      this.pills.delete(el);
+    }
+
+    const { setId, playId, setUuid, playUuid, parallelID, listingPrice, listingUrl, supply, parallelHint } = el._vpData;
 
     // ── Step 1: Position container and create pill immediately (synchronous) ──
     // Don't await the API before creating DOM — React SPAs re-render elements
@@ -117,7 +130,7 @@ export class CardPill {
     });
 
     const overlay = this._createOverlay(el, listingUrl);
-    const state = { pill, overlay, expanded: false };
+    const state = { pill, overlay, expanded: false, editionId };
     this.pills.set(el, state);
 
     pill.addEventListener('click', (e) => {

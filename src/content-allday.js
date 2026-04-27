@@ -12,7 +12,7 @@ class VaultopolisOverlay {
     this.detector = new AllDayDetector();
     this.pill = new CardPill('allday');
     this.currentUrl = window.location.href;
-    this.processedElements = new WeakSet();
+    this.processedEditions = new WeakMap(); // element → last-seen editionId
     this.debounceTimer = null;
     this.enabled = true;
     this.product = 'allday';
@@ -75,8 +75,8 @@ class VaultopolisOverlay {
   scanPage() {
     if (!this.enabled) return;
     for (const { element, editionId, playerName, listingPrice } of this.detector.findEditionElements()) {
-      if (this.processedElements.has(element)) continue;
-      this.processedElements.add(element);
+      if (this.processedEditions.get(element) === editionId) continue;
+      this.processedEditions.set(element, editionId);
 
       const linkEl = element.tagName === 'A' ? element : element.querySelector('a[href*="/listing/moment/"]');
       const listingUrl = linkEl?.href || element.href || '';

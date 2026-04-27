@@ -12,7 +12,7 @@ class VaultopolisOverlay {
     this.detector = new PinnacleDetector();
     this.pill = new CardPill('pinnacle');
     this.currentUrl = window.location.href;
-    this.processedElements = new WeakSet();
+    this.processedEditions = new WeakMap(); // element → last-seen editionId
     this.debounceTimer = null;
     this.enabled = true;
     this.product = 'pinnacle';
@@ -87,8 +87,8 @@ class VaultopolisOverlay {
   scanPage(buildSummary = false) {
     if (!this.enabled) return;
     for (const { element, editionId, playerName, listingPrice } of this.detector.findEditionElements()) {
-      if (this.processedElements.has(element)) continue;
-      this.processedElements.add(element);
+      if (this.processedEditions.get(element) === editionId) continue;
+      this.processedEditions.set(element, editionId);
 
       const linkEl = element.tagName === 'A' ? element : element.querySelector('a[href*="/pin/"], a[href*="/collectible/"]');
       const listingUrl = linkEl?.href || element.href || '';
