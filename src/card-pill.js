@@ -82,9 +82,8 @@ export class CardPill {
     pill.className = 'vp-pill';
     pill.style.cssText = `
       position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 40px;
+      left: 8px;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -121,11 +120,11 @@ export class CardPill {
     pill.appendChild(priceText);
 
     pill.addEventListener('mouseenter', () => {
-      pill.style.transform = 'translateX(-50%) scale(1.08)';
+      pill.style.transform = 'scale(1.08)';
       pill.style.boxShadow = '0 0 8px rgba(99, 102, 241, 0.5)';
     });
     pill.addEventListener('mouseleave', () => {
-      pill.style.transform = 'translateX(-50%) scale(1)';
+      pill.style.transform = 'scale(1)';
       pill.style.boxShadow = 'none';
     });
 
