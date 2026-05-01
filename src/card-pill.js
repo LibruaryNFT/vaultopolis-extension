@@ -557,14 +557,14 @@ export class CardPill {
         row('Sales (30d)', sales30d != null ? String(sales30d) : null),
         row('Sales (180d)', sales180d != null ? String(sales180d) : null),
       ].join(''),
-      sales: this.product === 'topshot' ? `
+      sales: `
         <div class="vp-sales-spark-host" style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 0 8px 0;border-bottom:1px solid rgba(45,45,74,0.6);min-height:36px">
           <div class="vp-sales-spark" style="flex:1"></div>
           <div class="vp-sales-spark-meta" style="font-size:10px;color:#8b8bab;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,0.9)"></div>
         </div>
         ${velocitySentence}
         <div class="vp-sales-rows" style="margin-top:4px;font-size:11px;color:#9ca3af;text-align:center">Loading sales…</div>
-      ` : null,
+      `,
     };
 
     const analyticsUrl = (() => {
@@ -587,7 +587,7 @@ export class CardPill {
     body.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
 
     const showOffers = this.product !== 'pinnacle';
-    const showSales = this.product === 'topshot';
+    const showSales = true; // Sales tab on all products (TopShot/AllDay/Pinnacle have edition-sales endpoints)
     const tabBtn = (name, label, active) => `<button class="vp-pill-tab${active ? ' vp-pill-tab-active' : ''}" data-tab="${name}" style="flex:1;padding:5px 0;border:none;background:none;color:${active ? '#6366f1' : '#9ca3af'};font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid ${active ? '#6366f1' : 'transparent'};margin-bottom:-1px;font-family:inherit;text-shadow:0 1px 3px rgba(0,0,0,0.8)">${label}</button>`;
 
     // Pre-render panels upfront — tab switching only toggles display,
@@ -687,20 +687,31 @@ export class CardPill {
     }
   }
 
-  /** Fetch recent sales and render sparkline + mini-table in the Sales tab (TopShot only). */
+  /** Fetch recent sales and render sparkline + mini-table in the Sales tab (all products). */
   async _fetchAndRenderSales(overlay, ed) {
     const rowsHost = overlay.querySelector('.vp-sales-rows');
     const sparkHost = overlay.querySelector('.vp-sales-spark');
     const sparkMeta = overlay.querySelector('.vp-sales-spark-meta');
     if (!rowsHost || !sparkHost) return;
 
-    const sId = ed.setID || ed.set_id;
-    const pId = ed.playID || ed.play_id;
-    const subId = ed.subeditionID ?? ed.subedition_id ?? 0;
-    if (!sId || !pId) { rowsHost.textContent = 'No sales data'; return; }
+    // Build product-specific URL. TopShot uses set/play/sub composite key;
+    // AllDay & Pinnacle use a single edition_id integer.
+    const url = (() => {
+      if (this.product === 'topshot') {
+        const sId = ed.setID || ed.set_id;
+        const pId = ed.playID || ed.play_id;
+        const subId = ed.subeditionID ?? ed.subedition_id ?? 0;
+        if (!sId || !pId) return null;
+        return `https://api.vaultopolis.com/topshot-edition-sales?set_id=${sId}&play_id=${pId}&subedition_id=${subId}&limit=30&days=180`;
+      }
+      const edId = ed.edition_id;
+      if (!edId) return null;
+      return `https://api.vaultopolis.com/${this.product}-edition-sales?edition_id=${encodeURIComponent(edId)}&limit=30&days=180`;
+    })();
+
+    if (!url) { rowsHost.textContent = 'No sales data'; return; }
 
     try {
-      const url = `https://api.vaultopolis.com/topshot-edition-sales?set_id=${sId}&play_id=${pId}&subedition_id=${subId}&limit=30&days=180`;
       const resp = await Promise.race([
         fetch(url),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
