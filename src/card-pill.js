@@ -286,53 +286,83 @@ export class CardPill {
     //
     // Direct fetch: use when editionId is already known (Pinnacle, AllDay).
     // SW path: TopShot only — needs UUID→editionId resolution from the index.
-    try {
-      let resp;
+    const fetchAttempt = async (timeoutMs) => {
       if (editionId) {
-        // Direct fetch — no SW involved
         const apiResp = await Promise.race([
           fetch(`https://api.vaultopolis.com/extension/v1/details/${this.product}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: [String(editionId)] }),
           }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
         ]);
         if (!apiResp.ok) throw new Error(`HTTP ${apiResp.status}`);
         const data = await apiResp.json();
         const ed = (data.editions || [])[0] || null;
-        resp = { success: true, data: ed };
-      } else {
-        // SW path for TopShot (UUID resolution required)
-        resp = await Promise.race([
-          chrome.runtime.sendMessage({
-            action: 'lookupOne',
-            market: this.product,
-            setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
-        ]);
+        return { success: true, data: ed };
       }
+      return Promise.race([
+        chrome.runtime.sendMessage({
+          action: 'lookupOne',
+          market: this.product,
+          setUuid, playUuid, setId, playId, parallelID, editionId, supply, parallelHint,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+      ]);
+    };
 
-      if (!state.expanded) return; // collapsed while loading
-
-      if (resp?.success && resp.data) {
-        this._renderDetails(overlay, resp.data, listingPrice, listingUrl);
-        return;
+    // Two attempts: short first try catches warm SW; longer retry covers cold start.
+    const attempts = [
+      { timeout: 6000, retryLabel: null },
+      { timeout: 10000, retryLabel: 'Retrying analytics…' },
+    ];
+    for (let i = 0; i < attempts.length; i++) {
+      const { timeout, retryLabel } = attempts[i];
+      if (retryLabel && state.expanded) {
+        const loadingEl = body.querySelector('.vp-loading-indicator');
+        if (loadingEl) loadingEl.textContent = retryLabel;
       }
-    } catch { /* fall through — show DOM data */ }
+      try {
+        const resp = await fetchAttempt(timeout);
+        if (!state.expanded) return;
+        if (resp?.success && resp.data) {
+          this._renderDetails(overlay, resp.data, listingPrice, listingUrl);
+          return;
+        }
+        // resp returned but had no data — break out and render fallback
+        break;
+      } catch {
+        if (i === attempts.length - 1) break;
+        // else: try again
+      }
+    }
 
-    // ── Fallback: service worker timed out or unavailable — keep DOM data ─────
+    // ── Fallback: SW/API unavailable — show DOM data + best-effort analytics link ─
     if (!state.expanded) return;
     const loadingEl = body.querySelector('.vp-loading-indicator');
     if (loadingEl) loadingEl.remove();
 
+    // Construct best-effort Full Analytics URL from DOM data so users always have an out
+    const fallbackAnalyticsUrl = (() => {
+      if (this.product === 'topshot' && setId && playId) {
+        return `https://vaultopolis.com/analytics/topshot/edition/${setId}/${playId}`;
+      }
+      if ((this.product === 'allday' || this.product === 'pinnacle') && editionId) {
+        return `https://vaultopolis.com/analytics/${this.product}/edition/${editionId}`;
+      }
+      return 'https://vaultopolis.com';
+    })();
+
+    const buttons = [];
     if (safeUrl(listingUrl)) {
-      const linkDiv = document.createElement('div');
-      linkDiv.style.cssText = 'display:flex;padding-top:6px;margin-top:4px;border-top:1px solid rgba(45,45,74,0.6);flex-shrink:0;';
-      linkDiv.innerHTML = `<a href="${escAttr(listingUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(99,102,241,0.9);color:#fff;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">View Listing</a>`;
-      body.appendChild(linkDiv);
+      buttons.push(`<a href="${escAttr(listingUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(99,102,241,0.9);color:#fff;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">View Listing</a>`);
     }
+    buttons.push(`<a href="${escAttr(fallbackAnalyticsUrl)}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:rgba(10,10,24,0.6);color:#a5b4fc;border:1px solid rgba(99,102,241,0.6);border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;text-decoration:none;font-family:inherit;display:block">Full Analytics</a>`);
+
+    const linkDiv = document.createElement('div');
+    linkDiv.style.cssText = 'display:flex;gap:6px;padding-top:6px;margin-top:4px;border-top:1px solid rgba(45,45,74,0.6);flex-shrink:0;';
+    linkDiv.innerHTML = buttons.join('');
+    body.appendChild(linkDiv);
   }
 
   _collapse(state) {
