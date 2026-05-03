@@ -103,6 +103,49 @@ export class CardPill {
 
   init() {
     this._startObserver();
+    this._installInputFocusSuppression();
+  }
+
+  /**
+   * Hide pills + overlays while the user is interacting with a text input,
+   * search box, or combobox. Sites' autocomplete/suggestion dropdowns often
+   * render at lower z-index than our pills (z-index: 10), so without this
+   * the pills paint on top of the dropdown (TopShot marketplace search).
+   * Capture-phase listeners catch focus events even from inputs in shadow
+   * roots / portaled popovers.
+   */
+  _installInputFocusSuppression() {
+    if (document.getElementById('vp-input-suppress')) return;
+    const style = document.createElement('style');
+    style.id = 'vp-input-suppress';
+    style.textContent = `
+      html.vp-input-active .vp-pill,
+      html.vp-input-active .vp-pill-overlay { visibility: hidden !important; }
+    `;
+    document.head.appendChild(style);
+
+    const isInteractive = (el) =>
+      !!el && typeof el.matches === 'function' && el.matches(
+        'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]),' +
+        'textarea,' +
+        '[role="combobox"],' +
+        '[role="searchbox"],' +
+        '[role="textbox"],' +
+        '[contenteditable="true"]'
+      );
+
+    document.addEventListener('focusin', (e) => {
+      if (isInteractive(e.target)) document.documentElement.classList.add('vp-input-active');
+    }, true);
+
+    document.addEventListener('focusout', () => {
+      // Defer so a click on a dropdown item (which moves focus) doesn't flicker pills back.
+      setTimeout(() => {
+        if (!isInteractive(document.activeElement)) {
+          document.documentElement.classList.remove('vp-input-active');
+        }
+      }, 200);
+    }, true);
   }
 
   /** Register a card element for pill rendering.
