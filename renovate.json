@@ -6,15 +6,13 @@
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "labels": ["dependencies"],
+  "vulnerabilityAlerts": {
+    "automerge": true,
+    "automergeType": "pr",
+    "minimumReleaseAge": "1 day",
+    "labels": ["dependencies", "security"]
+  },
   "packageRules": [
-    {
-      "description": "Security vulnerabilities: fast-track with 1-day supply chain window",
-      "isVulnerabilityAlert": true,
-      "automerge": true,
-      "automergeType": "pr",
-      "minimumReleaseAge": "1 day",
-      "labels": ["dependencies", "security"]
-    },
     {
       "description": "Dev dependencies patch+minor: auto-merge after 1-day window",
       "matchDepTypes": ["devDependencies", "dev"],
