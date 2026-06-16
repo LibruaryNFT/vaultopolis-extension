@@ -9,7 +9,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "playwright": "^1.61.0"
   },
   "dependencies": {
