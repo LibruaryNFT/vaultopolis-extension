@@ -7,9 +7,23 @@ updates:
       day: "monday"
     open-pull-requests-limit: 5
 
+      # Group patch bumps into one PR (less noise); minor/major stay
+      # individual so the auto-merge workflow can classify each.
+    groups:
+      patch-updates:
+        applies-to: version-updates
+        update-types:
+          - patch
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+      # Group patch bumps into one PR (less noise); minor/major stay
+      # individual so the auto-merge workflow can classify each.
+    groups:
+      patch-updates:
+        applies-to: version-updates
+        update-types:
+          - patch
